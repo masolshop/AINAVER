@@ -1,2 +1,2 @@
 flask==3.0.0
-playwright==1.40.0
+# playwright==1.40.0  # 로컬에서 실제 크롤링 시 필요

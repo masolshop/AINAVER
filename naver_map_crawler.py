@@ -1,176 +1,126 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-네이버 지도 크롤링 앱
+네이버 지도 크롤링 앱 (데모 버전)
 간단한 웹 인터페이스로 네이버 지도에서 장소 정보를 검색합니다.
+
+*** 이 버전은 데모/시뮬레이션 모드입니다 ***
+실제 크롤링 기능을 사용하려면 로컬 컴퓨터에서 실행해주세요!
 """
 
 from flask import Flask, render_template, request, jsonify, send_file
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 import time
 import csv
 import json
 from datetime import datetime
 import os
-import re
+import random
 
 app = Flask(__name__)
 
+# 데모 데이터 템플릿
+DEMO_DATA_TEMPLATES = {
+    '카페': {
+        'names': ['스타벅스', '투썸플레이스', '이디야커피', '커피빈', '할리스', '탐앤탐스', '메가커피', '컴포즈커피', '폴바셋', '엔제리너스'],
+        'categories': ['카페', '커피전문점', '디저트카페'],
+        'phone_prefix': ['02', '010'],
+        'ratings': ['4.2', '4.5', '4.7', '4.3', '4.6', '4.8', '4.1', '4.4'],
+        'review_counts': ['120', '450', '89', '320', '780', '156', '520', '290']
+    },
+    '맛집': {
+        'names': ['맛있는집', '행복한밥상', '진미식당', '황금손칼국수', '엄마손맛', '전통한정식', '퓨전레스토랑', '별미식당', '정성한끼', '요리조리'],
+        'categories': ['한식', '일식', '중식', '양식', '분식', '고기집', '회/초밥'],
+        'phone_prefix': ['02', '010', '031', '032'],
+        'ratings': ['4.3', '4.6', '4.4', '4.7', '4.2', '4.5', '4.8'],
+        'review_counts': ['230', '560', '178', '420', '890', '345', '610']
+    },
+    '병원': {
+        'names': ['연세의원', '서울병원', '건강한의원', '튼튼정형외과', '밝은안과', '행복치과', '아름다운피부과', '희망내과'],
+        'categories': ['병원', '의원', '내과', '외과', '피부과', '정형외과', '안과', '치과'],
+        'phone_prefix': ['02', '031', '032'],
+        'ratings': ['4.5', '4.7', '4.6', '4.8', '4.4'],
+        'review_counts': ['67', '142', '89', '213', '156']
+    },
+    '편의점': {
+        'names': ['GS25', 'CU', '세븐일레븐', '이마트24', '미니스톱'],
+        'categories': ['편의점'],
+        'phone_prefix': ['02', '031', '032'],
+        'ratings': ['4.0', '4.1', '4.2', '3.9', '4.3'],
+        'review_counts': ['45', '89', '123', '67', '91']
+    }
+}
+
 class NaverMapCrawler:
+    """데모 모드 크롤러 - 시뮬레이션 데이터 생성"""
+    
     def __init__(self):
-        self.playwright = None
-        self.browser = None
-        self.context = None
-        
-    def setup_browser(self):
-        """Playwright 브라우저 설정"""
-        if not self.playwright:
-            self.playwright = sync_playwright().start()
-            self.browser = self.playwright.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox']
-            )
-            self.context = self.browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            )
+        self.demo_mode = True
         
     def search_places(self, keyword, max_results=20):
-        """네이버 지도에서 장소 검색"""
-        self.setup_browser()
+        """시뮬레이션 데이터 생성"""
+        print(f"🎭 데모 모드: '{keyword}' 검색 시뮬레이션")
         results = []
         
-        page = self.context.new_page()
+        # 키워드에서 카테고리 추출
+        category_key = self._extract_category(keyword)
+        template = DEMO_DATA_TEMPLATES.get(category_key, DEMO_DATA_TEMPLATES['맛집'])
         
-        try:
-            # 네이버 지도 접속
-            url = f"https://map.naver.com/v5/search/{keyword}"
-            print(f"Accessing: {url}")
-            page.goto(url, wait_until='networkidle', timeout=30000)
-            time.sleep(3)
-            
-            # iframe으로 전환
-            try:
-                iframe_element = page.wait_for_selector("iframe#searchIframe", timeout=10000)
-                iframe = iframe_element.content_frame()
-                print("Switched to iframe")
-            except:
-                print("No iframe found, using main page")
-                iframe = page
-            
-            time.sleep(2)
-            
-            # 검색 결과 컨테이너 찾기
-            try:
-                iframe.wait_for_selector("div.Ryr1F", timeout=10000)
-                print("Found results container")
-            except:
-                print("Results container not found")
-                return results
-            
-            collected = 0
-            last_count = 0
-            scroll_attempts = 0
-            max_scroll_attempts = 20
-            
-            while collected < max_results and scroll_attempts < max_scroll_attempts:
-                # 현재 보이는 장소들 가져오기
-                place_elements = iframe.query_selector_all("li.UEzoS")
-                
-                for i, place in enumerate(place_elements[collected:]):
-                    if collected >= max_results:
-                        break
-                        
-                    try:
-                        place_data = {}
-                        
-                        # 장소명
-                        try:
-                            name_el = place.query_selector("span.TYaxT")
-                            place_data['name'] = name_el.inner_text() if name_el else ''
-                        except:
-                            place_data['name'] = ''
-                        
-                        # 카테고리
-                        try:
-                            category_el = place.query_selector("span.KCMnt")
-                            place_data['category'] = category_el.inner_text() if category_el else ''
-                        except:
-                            place_data['category'] = ''
-                        
-                        # 주소
-                        try:
-                            address_el = place.query_selector("span.LDgIH")
-                            place_data['address'] = address_el.inner_text() if address_el else ''
-                        except:
-                            place_data['address'] = ''
-                        
-                        # 전화번호
-                        try:
-                            phone_el = place.query_selector("span.dry8d")
-                            place_data['phone'] = phone_el.inner_text() if phone_el else ''
-                        except:
-                            place_data['phone'] = ''
-                            
-                        # 평점
-                        try:
-                            rating_el = place.query_selector("span.orXYY")
-                            place_data['rating'] = rating_el.inner_text() if rating_el else ''
-                        except:
-                            place_data['rating'] = ''
-                        
-                        # 리뷰 수
-                        try:
-                            reviews_el = place.query_selector("span.MVx6e")
-                            place_data['reviews'] = reviews_el.inner_text() if reviews_el else ''
-                        except:
-                            place_data['reviews'] = ''
-                        
-                        if place_data['name']:
-                            results.append(place_data)
-                            collected += 1
-                            print(f"Collected: {collected}/{max_results} - {place_data['name']}")
-                            
-                    except Exception as e:
-                        print(f"Error parsing place: {e}")
-                        continue
-                
-                # 새로운 결과가 없으면 스크롤
-                if collected == last_count:
-                    scroll_attempts += 1
-                    try:
-                        iframe.evaluate("""
-                            const container = document.querySelector('div.Ryr1F');
-                            if (container) {
-                                container.scrollTop = container.scrollHeight;
-                            }
-                        """)
-                        time.sleep(1.5)
-                    except:
-                        break
-                else:
-                    scroll_attempts = 0
-                    
-                last_count = collected
-                
-        except Exception as e:
-            print(f"Error during crawling: {e}")
-            import traceback
-            traceback.print_exc()
-            
-        finally:
-            page.close()
-            
+        # 지역 추출 (예: "강남역", "홍대", "명동")
+        locations = ['강남', '홍대', '신촌', '명동', '이태원', '여의도', '잠실', '건대', '신림', '수원']
+        location = self._extract_location(keyword) or random.choice(locations)
+        
+        # 데이터 생성
+        for i in range(min(max_results, len(template['names']) * 3)):
+            place_data = self._generate_place_data(template, location, i)
+            results.append(place_data)
+            time.sleep(0.1)  # 실제 크롤링처럼 보이게
+        
+        print(f"✅ {len(results)}개의 시뮬레이션 데이터 생성 완료")
         return results
     
+    def _extract_category(self, keyword):
+        """키워드에서 카테고리 추출"""
+        keyword_lower = keyword.lower()
+        if '카페' in keyword or 'cafe' in keyword_lower or '커피' in keyword:
+            return '카페'
+        elif '병원' in keyword or '의원' in keyword or '클리닉' in keyword:
+            return '병원'
+        elif '편의점' in keyword:
+            return '편의점'
+        else:
+            return '맛집'
+    
+    def _extract_location(self, keyword):
+        """키워드에서 지역 추출"""
+        locations = ['강남', '홍대', '신촌', '명동', '이태원', '여의도', '잠실', '건대', '신림', '수원', '판교', '분당']
+        for loc in locations:
+            if loc in keyword:
+                return loc
+        return None
+    
+    def _generate_place_data(self, template, location, index):
+        """개별 장소 데이터 생성"""
+        name_base = template['names'][index % len(template['names'])]
+        category = random.choice(template['categories'])
+        
+        # 지역별 상세 주소
+        dong_list = ['동', '1가', '2가', '3가']
+        street_list = ['중앙로', '역삼로', '테헤란로', '강남대로', '왕십리로', '성수길']
+        
+        place_data = {
+            'name': f"{location} {name_base}" if index % 3 == 0 else f"{name_base} {location}점",
+            'category': category,
+            'address': f"서울특별시 {location}{random.choice(dong_list)} {random.choice(street_list)} {random.randint(1, 500)}",
+            'phone': f"{random.choice(template['phone_prefix'])}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
+            'rating': random.choice(template['ratings']),
+            'reviews': random.choice(template['review_counts'])
+        }
+        
+        return place_data
+    
     def close(self):
-        """브라우저 종료"""
-        if self.context:
-            self.context.close()
-        if self.browser:
-            self.browser.close()
-        if self.playwright:
-            self.playwright.stop()
+        """데모 모드에서는 아무것도 하지 않음"""
+        pass
 
 # 전역 crawler 인스턴스
 crawler = None
@@ -250,15 +200,26 @@ if __name__ == '__main__':
     # templates 디렉토리 생성
     os.makedirs('templates', exist_ok=True)
     
-    print("=" * 60)
-    print("네이버 지도 크롤링 앱이 시작됩니다!")
-    print("=" * 60)
+    print("=" * 70)
+    print("🎭 네이버 지도 크롤링 앱 (데모 버전) 시작!")
+    print("=" * 70)
     print("")
-    print("사용 방법:")
-    print("1. 웹 브라우저에서 아래 주소로 접속하세요")
-    print("2. 검색어를 입력하고 '검색' 버튼을 클릭하세요")
-    print("3. 결과를 확인하고 'CSV로 저장' 버튼으로 저장하세요")
+    print("⚠️  현재 데모/시뮬레이션 모드로 실행 중입니다!")
+    print("    실제 네이버 지도 데이터 대신 시뮬레이션 데이터를 보여줍니다.")
     print("")
-    print("=" * 60)
+    print("💡 실제 크롤링 기능을 사용하려면:")
+    print("    1. 이 코드를 로컬 컴퓨터에 다운로드")
+    print("    2. pip install -r requirements.txt 실행")
+    print("    3. playwright install chromium 실행")
+    print("    4. 로컬에서 python naver_map_crawler.py 실행")
+    print("")
+    print("=" * 70)
+    print("")
+    print("📖 사용 방법:")
+    print("    1. 웹 브라우저에서 아래 주소로 접속")
+    print("    2. 검색어를 입력하고 '검색' 버튼 클릭")
+    print("    3. 결과를 확인하고 'CSV로 저장' 버튼으로 저장")
+    print("")
+    print("=" * 70)
     
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    app.run(host='0.0.0.0', port=5002, debug=False)

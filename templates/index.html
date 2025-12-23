@@ -44,6 +44,23 @@
             opacity: 0.9;
         }
 
+        .demo-badge {
+            display: inline-block;
+            background: #ff9800;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-top: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
         .content {
             padding: 40px;
         }
@@ -322,6 +339,7 @@
         <div class="header">
             <h1>🗺️ 네이버 지도 크롤링 앱</h1>
             <p>원하는 장소를 검색하고 정보를 쉽게 수집하세요</p>
+            <div class="demo-badge">🎭 데모 모드 (시뮬레이션 데이터)</div>
         </div>
 
         <div class="content">
@@ -361,6 +379,11 @@
 
             <div class="instructions">
                 <h3>📖 사용 방법</h3>
+                <div class="alert alert-info" style="margin-bottom: 15px; padding: 15px; background: #fff3cd; color: #856404; border: 1px solid #ffc107;">
+                    <strong>⚠️ 데모 모드 안내:</strong><br>
+                    현재 시뮬레이션 데이터를 보여주는 데모 모드입니다.<br>
+                    실제 네이버 지도 크롤링 기능을 사용하려면 로컬 컴퓨터에서 실행해주세요!
+                </div>
                 <ol>
                     <li><strong>검색어 입력:</strong> 찾고 싶은 장소를 입력하세요 (예: "강남역 맛집", "홍대 카페")</li>
                     <li><strong>결과 수 설정:</strong> 가져올 최대 결과 개수를 설정하세요 (1~100개)</li>
@@ -368,6 +391,13 @@
                     <li><strong>결과 확인:</strong> 장소명, 주소, 전화번호, 평점 등의 정보를 확인하세요</li>
                     <li><strong>저장:</strong> 'CSV로 저장' 버튼을 클릭하면 엑셀에서 열 수 있는 파일로 저장됩니다</li>
                 </ol>
+                <div style="margin-top: 20px; padding: 15px; background: #e7f3ff; border-left: 4px solid #2196f3;">
+                    <strong>💡 실제 크롤링 사용법:</strong><br>
+                    1. GitHub에서 코드 다운로드<br>
+                    2. <code>pip install -r requirements.txt</code> 실행<br>
+                    3. <code>playwright install chromium</code> 실행<br>
+                    4. 로컬에서 <code>python naver_map_crawler.py</code> 실행
+                </div>
             </div>
         </div>
     </div>
