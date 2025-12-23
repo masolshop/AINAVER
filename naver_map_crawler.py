@@ -104,7 +104,7 @@ class NaverMapCrawler:
         
         # 데이터 생성
         for i in range(min(max_results, len(template['names']) * 3)):
-            place_data = self._generate_place_data(template, location, i)
+            place_data = self._generate_place_data(template, location, i, keyword)
             results.append(place_data)
             time.sleep(0.1)  # 실제 크롤링처럼 보이게
         
@@ -131,7 +131,7 @@ class NaverMapCrawler:
                 return loc
         return None
     
-    def _generate_place_data(self, template, location, index):
+    def _generate_place_data(self, template, location, index, keyword=''):
         """개별 장소 데이터 생성 (타지역업체 포함)"""
         name_base = template['names'][index % len(template['names'])]
         category = random.choice(template['categories'])
@@ -143,11 +143,20 @@ class NaverMapCrawler:
         dong_list = ['동', '1가', '2가', '3가']
         street_list = ['중앙로', '역삼로', '테헤란로', '강남대로', '왕십리로', '성수길']
         
+        # 키워드에서 업종 키워드 추출 (예: "강남역 맛집" -> "맛집")
+        business_keyword = self._extract_business_keyword(keyword)
+        
         if is_other_region:
-            # 타지역업체: 동/구 단위 주소, 070번호, 짧은 상호명
-            short_name = name_base[:10] if len(name_base) > 10 else name_base
+            # 타지역업체: 동/구 단위 주소, 070번호, 키워드 포함 상호명
+            if business_keyword and random.random() < 0.8:  # 80% 확률로 키워드 포함
+                # "홍대맛집배달", "강남카페전문점" 등
+                suffixes = ['배달', '전문점', '할인', '24시', '예약', '추천', '인기', '맛집']
+                short_name = f"{location}{business_keyword}{random.choice(suffixes)}"
+            else:
+                short_name = name_base[:10] if len(name_base) > 10 else name_base
+            
             place_data = {
-                'name': f"{short_name}",
+                'name': short_name,
                 'category': category,
                 'address': f"서울특별시 {location}{random.choice(dong_list)}",  # 동까지만
                 'phone': f"070-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
@@ -170,6 +179,23 @@ class NaverMapCrawler:
             }
         
         return place_data
+    
+    def _extract_business_keyword(self, keyword):
+        """키워드에서 업종 키워드 추출"""
+        business_keywords = [
+            '맛집', '카페', '치킨', '피자', '족발', '보쌈', '삼겹살', '고기', 
+            '중식', '일식', '양식', '한식', '분식', '회', '초밥',
+            '병원', '의원', '한의원', '치과', '피부과', '안과', '정형외과',
+            '약국', '편의점', '미용실', '네일샵', '헬스장', '필라테스',
+            '학원', '독서실', 'PC방', '노래방', '찜질방',
+            '숙박', '호텔', '모텔', '게스트하우스', '펜션'
+        ]
+        
+        for biz_keyword in business_keywords:
+            if biz_keyword in keyword:
+                return biz_keyword
+        
+        return None
     
     def close(self):
         """데모 모드에서는 아무것도 하지 않음"""
