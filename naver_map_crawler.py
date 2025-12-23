@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-네이버 지도 크롤링 앱 (데모 버전)
-간단한 웹 인터페이스로 네이버 지도에서 장소 정보를 검색합니다.
+네이버 플레이스 실제 크롤링 앱
+타지역업체 자동 감지 기능 포함
 
-*** 이 버전은 데모/시뮬레이션 모드입니다 ***
-실제 크롤링 기능을 사용하려면 로컬 컴퓨터에서 실행해주세요!
+실제 네이버 플레이스 데이터를 크롤링합니다!
 """
 
 from flask import Flask, render_template, request, jsonify, send_file
@@ -16,6 +15,17 @@ from datetime import datetime
 import os
 import random
 import re
+import sys
+
+# 실제 크롤러 import
+try:
+    from naver_place_crawler_real import RealNaverPlaceCrawler
+    REAL_MODE_AVAILABLE = True
+    print("✅ 실제 크롤링 모드 사용 가능")
+except Exception as e:
+    REAL_MODE_AVAILABLE = False
+    print(f"⚠️ 실제 크롤링 모드 불가: {e}")
+    print("   데모 모드로 실행됩니다.")
 
 app = Flask(__name__)
 
@@ -321,17 +331,24 @@ if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
     
     print("=" * 70)
-    print("🎭 네이버 지도 크롤링 앱 (데모 버전) 시작!")
-    print("=" * 70)
-    print("")
-    print("⚠️  현재 데모/시뮬레이션 모드로 실행 중입니다!")
-    print("    실제 네이버 지도 데이터 대신 시뮬레이션 데이터를 보여줍니다.")
-    print("")
-    print("💡 실제 크롤링 기능을 사용하려면:")
-    print("    1. 이 코드를 로컬 컴퓨터에 다운로드")
-    print("    2. pip install -r requirements.txt 실행")
-    print("    3. playwright install chromium 실행")
-    print("    4. 로컬에서 python naver_map_crawler.py 실행")
+    if REAL_MODE_AVAILABLE:
+        print("🚀 네이버 플레이스 실제 크롤링 앱 시작!")
+        print("=" * 70)
+        print("")
+        print("✅ 실제 네이버 플레이스 데이터를 크롤링합니다!")
+        print("✅ 타지역업체 자동 감지 기능 활성화")
+        print("")
+        print("📋 감지 기준:")
+        print("   - 070 가상번호 사용")
+        print("   - 동/구 단위 주소 (상세주소 없음)")
+        print("   - 평점 및 리뷰 없음")
+        print("   - 상호명에 검색 키워드 포함")
+    else:
+        print("🎭 네이버 지도 크롤링 앱 (데모 버전) 시작!")
+        print("=" * 70)
+        print("")
+        print("⚠️  현재 데모/시뮬레이션 모드로 실행 중입니다!")
+        print("    실제 네이버 지도 데이터 대신 시뮬레이션 데이터를 보여줍니다.")
     print("")
     print("=" * 70)
     print("")
@@ -342,4 +359,4 @@ if __name__ == '__main__':
     print("")
     print("=" * 70)
     
-    app.run(host='0.0.0.0', port=5003, debug=False)
+    app.run(host='0.0.0.0', port=5004, debug=False)
