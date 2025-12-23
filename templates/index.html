@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>네이버 지도 크롤링 앱</title>
+    <title>네이버 플레이스 크롤링 앱 - 타지역업체 분석</title>
     <style>
         * {
             margin: 0;
@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
@@ -65,6 +65,42 @@
             padding: 40px;
         }
 
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-button {
+            padding: 15px 30px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-button:hover {
+            color: #667eea;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .search-section {
             background: #f8f9fa;
             padding: 30px;
@@ -91,18 +127,30 @@
             color: #333;
         }
 
-        .input-group input {
+        .input-group input, .input-group textarea {
             width: 100%;
             padding: 12px 15px;
             border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 16px;
             transition: border-color 0.3s;
+            font-family: inherit;
         }
 
-        .input-group input:focus {
+        .input-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .input-group input:focus, .input-group textarea:focus {
             outline: none;
             border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .btn {
@@ -113,6 +161,9 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .btn-primary {
@@ -133,19 +184,27 @@
         .btn-success:hover {
             background: #218838;
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
         }
 
         .btn:disabled {
-            opacity: 0.6;
+            background: #ccc;
             cursor: not-allowed;
-            transform: none !important;
+            transform: none;
         }
 
         .loading {
             display: none;
             text-align: center;
-            padding: 20px;
+            padding: 30px;
         }
 
         .loading.active {
@@ -156,8 +215,8 @@
             border: 4px solid #f3f3f3;
             border-top: 4px solid #667eea;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             animation: spin 1s linear infinite;
             margin: 0 auto 15px;
         }
@@ -167,152 +226,234 @@
             100% { transform: rotate(360deg); }
         }
 
+        .place-tab-info {
+            display: none;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .place-tab-info.active {
+            display: block;
+        }
+
+        .place-tab-info.has-tab {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+
+        .place-tab-info.no-tab {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+
+        .statistics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-card.warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .stat-card.success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .stat-card h3 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
         .results-section {
             display: none;
+            margin-top: 30px;
         }
 
         .results-section.active {
             display: block;
         }
 
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #eee;
-        }
-
-        .results-header h2 {
-            color: #333;
-        }
-
-        .results-count {
-            color: #667eea;
-            font-weight: 600;
-            font-size: 1.2em;
-        }
-
         .results-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 20px;
-            margin-bottom: 30px;
+            margin-top: 20px;
         }
 
         .place-card {
             background: white;
-            border: 2px solid #eee;
+            border: 2px solid #e0e0e0;
             border-radius: 12px;
             padding: 20px;
             transition: all 0.3s;
+            position: relative;
         }
 
         .place-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
         }
 
-        .place-name {
-            font-size: 1.3em;
-            font-weight: 700;
+        .place-card.other-region {
+            border-color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .place-type-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .place-type-badge.main {
+            background: #4caf50;
+            color: white;
+        }
+
+        .place-type-badge.other {
+            background: #ff9800;
+            color: white;
+        }
+
+        .place-card h3 {
             color: #333;
             margin-bottom: 10px;
+            font-size: 1.3em;
+            padding-right: 100px;
         }
 
-        .place-category {
+        .place-card .category {
             display: inline-block;
             background: #667eea;
             color: white;
-            padding: 5px 12px;
-            border-radius: 20px;
+            padding: 4px 12px;
+            border-radius: 15px;
             font-size: 0.85em;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
-        .place-info {
+        .place-card .info {
+            margin: 8px 0;
+            color: #555;
+            font-size: 0.95em;
             display: flex;
-            flex-direction: column;
+            align-items: flex-start;
             gap: 8px;
         }
 
-        .place-info-item {
-            display: flex;
-            align-items: flex-start;
-            font-size: 0.95em;
-            color: #666;
-        }
-
-        .place-info-item strong {
-            min-width: 70px;
+        .place-card .info strong {
+            min-width: 60px;
             color: #333;
         }
 
-        .place-rating {
+        .place-card .rating {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #eee;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
         }
 
         .rating-star {
-            color: #ffc107;
+            color: #ffd700;
             font-size: 1.2em;
         }
 
-        .rating-value {
-            font-weight: 600;
-            color: #333;
+        .batch-results {
+            margin-top: 20px;
         }
 
-        .review-count {
-            color: #888;
+        .batch-result-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .batch-result-item.has-tab {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .batch-result-item.no-tab {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .batch-result-keyword {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .batch-result-status {
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-weight: 600;
             font-size: 0.9em;
         }
 
+        .batch-result-status.success {
+            background: #28a745;
+            color: white;
+        }
+
+        .batch-result-status.danger {
+            background: #dc3545;
+            color: white;
+        }
+
         .alert {
-            padding: 15px 20px;
+            padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
         }
 
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
         .alert-info {
             background: #d1ecf1;
-            color: #0c5460;
             border: 1px solid #bee5eb;
+            color: #0c5460;
         }
 
-        .instructions {
-            background: #e7f3ff;
-            padding: 25px;
-            border-radius: 12px;
-            margin-top: 30px;
-            border-left: 5px solid #667eea;
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
         }
 
-        .instructions h3 {
-            color: #333;
-            margin-bottom: 15px;
-        }
-
-        .instructions ol {
-            margin-left: 20px;
-            line-height: 1.8;
-            color: #555;
-        }
-
-        .instructions li {
-            margin-bottom: 8px;
+        .export-section {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-top: 20px;
         }
 
         @media (max-width: 768px) {
@@ -331,234 +472,446 @@
             .results-grid {
                 grid-template-columns: 1fr;
             }
+
+            .statistics {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🗺️ 네이버 지도 크롤링 앱</h1>
-            <p>원하는 장소를 검색하고 정보를 쉽게 수집하세요</p>
-            <div class="demo-badge">🎭 데모 모드 (시뮬레이션 데이터)</div>
+            <h1>🗺️ 네이버 플레이스 크롤링 앱</h1>
+            <p>플레이스 탭 감지 & 타지역업체 분석 시스템</p>
+            <div class="demo-badge">🎭 데모 모드</div>
         </div>
 
         <div class="content">
-            <div class="search-section">
-                <div class="search-form">
+            <div class="alert alert-info">
+                <strong>💡 데모 모드 안내:</strong> 현재 시뮬레이션 데이터로 작동합니다. 실제 크롤링은 로컬 환경에서 실행하세요!
+            </div>
+
+            <div class="tabs">
+                <button class="tab-button active" data-tab="search">🔍 장소 검색</button>
+                <button class="tab-button" data-tab="place-check">✅ 플레이스 탭 확인</button>
+                <button class="tab-button" data-tab="batch-check">📋 일괄 키워드 검증</button>
+            </div>
+
+            <!-- 탭 1: 장소 검색 -->
+            <div id="tab-search" class="tab-content active">
+                <div class="search-section">
+                    <h2 style="margin-bottom: 20px;">🔍 장소 검색 (타지역업체 분석)</h2>
+                    <div class="search-form">
+                        <div class="input-group">
+                            <label for="keyword">검색어</label>
+                            <input type="text" id="keyword" placeholder="예: 강남역 맛집, 홍대 카페">
+                        </div>
+                        <div class="input-group" style="max-width: 200px;">
+                            <label for="maxResults">최대 결과 수</label>
+                            <input type="number" id="maxResults" value="20" min="1" max="100">
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-primary" onclick="searchPlaces()">
+                            🔍 검색하기
+                        </button>
+                        <button class="btn btn-success" id="exportBtn" onclick="exportToCSV()" disabled>
+                            💾 CSV로 저장
+                        </button>
+                    </div>
+                </div>
+
+                <div class="place-tab-info" id="placeTabInfo"></div>
+
+                <div class="loading" id="searchLoading">
+                    <div class="spinner"></div>
+                    <p>데이터를 불러오는 중입니다...</p>
+                </div>
+
+                <div class="results-section" id="searchResults">
+                    <div class="statistics" id="statistics"></div>
+                    <h2>📍 검색 결과 (<span id="resultCount">0</span>개)</h2>
+                    <div class="results-grid" id="resultsGrid"></div>
+                    <div class="export-section">
+                        <button class="btn btn-success" onclick="exportToCSV()">
+                            💾 CSV로 저장
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 탭 2: 플레이스 탭 확인 -->
+            <div id="tab-place-check" class="tab-content">
+                <div class="search-section">
+                    <h2 style="margin-bottom: 20px;">✅ 플레이스 탭 표시 여부 확인</h2>
+                    <p style="margin-bottom: 20px; color: #666;">
+                        키워드가 네이버 검색 1페이지에 "플레이스 탭"을 표시하는지 확인합니다.
+                    </p>
                     <div class="input-group">
-                        <label for="keyword">검색어</label>
-                        <input type="text" id="keyword" placeholder="예: 강남역 맛집, 홍대 카페" />
+                        <label for="placeCheckKeyword">확인할 키워드</label>
+                        <input type="text" id="placeCheckKeyword" placeholder="예: 강남역 맛집">
                     </div>
+                    <button class="btn btn-primary" onclick="checkPlaceTab()" style="margin-top: 15px;">
+                        ✅ 플레이스 탭 확인
+                    </button>
+                </div>
+
+                <div class="loading" id="placeCheckLoading">
+                    <div class="spinner"></div>
+                    <p>확인 중...</p>
+                </div>
+
+                <div id="placeCheckResult"></div>
+            </div>
+
+            <!-- 탭 3: 일괄 키워드 검증 -->
+            <div id="tab-batch-check" class="tab-content">
+                <div class="search-section">
+                    <h2 style="margin-bottom: 20px;">📋 일괄 키워드 검증</h2>
+                    <p style="margin-bottom: 20px; color: #666;">
+                        여러 키워드를 한 번에 검증합니다. 한 줄에 하나씩 입력하세요.
+                    </p>
                     <div class="input-group">
-                        <label for="maxResults">최대 결과 수</label>
-                        <input type="number" id="maxResults" value="20" min="1" max="100" />
+                        <label for="batchKeywords">키워드 목록 (한 줄에 하나씩)</label>
+                        <textarea id="batchKeywords" placeholder="강남역 맛집
+홍대 카페
+신촌 병원
+명동 피부과"></textarea>
                     </div>
-                    <div class="input-group" style="display: flex; align-items: flex-end;">
-                        <button class="btn btn-primary" onclick="searchPlaces()">🔍 검색</button>
-                    </div>
+                    <button class="btn btn-primary" onclick="batchCheckPlaceTabs()" style="margin-top: 15px;">
+                        📋 일괄 검증
+                    </button>
                 </div>
-            </div>
 
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p>검색 중입니다... 잠시만 기다려주세요.</p>
-            </div>
-
-            <div id="error"></div>
-
-            <div class="results-section" id="resultsSection">
-                <div class="results-header">
-                    <div>
-                        <h2>검색 결과</h2>
-                        <span class="results-count" id="resultsCount"></span>
-                    </div>
-                    <button class="btn btn-success" onclick="exportToCSV()">📥 CSV로 저장</button>
+                <div class="loading" id="batchCheckLoading">
+                    <div class="spinner"></div>
+                    <p>검증 중...</p>
                 </div>
-                <div class="results-grid" id="resultsGrid"></div>
-            </div>
 
-            <div class="instructions">
-                <h3>📖 사용 방법</h3>
-                <div class="alert alert-info" style="margin-bottom: 15px; padding: 15px; background: #fff3cd; color: #856404; border: 1px solid #ffc107;">
-                    <strong>⚠️ 데모 모드 안내:</strong><br>
-                    현재 시뮬레이션 데이터를 보여주는 데모 모드입니다.<br>
-                    실제 네이버 지도 크롤링 기능을 사용하려면 로컬 컴퓨터에서 실행해주세요!
-                </div>
-                <ol>
-                    <li><strong>검색어 입력:</strong> 찾고 싶은 장소를 입력하세요 (예: "강남역 맛집", "홍대 카페")</li>
-                    <li><strong>결과 수 설정:</strong> 가져올 최대 결과 개수를 설정하세요 (1~100개)</li>
-                    <li><strong>검색 실행:</strong> '검색' 버튼을 클릭하면 자동으로 데이터를 수집합니다</li>
-                    <li><strong>결과 확인:</strong> 장소명, 주소, 전화번호, 평점 등의 정보를 확인하세요</li>
-                    <li><strong>저장:</strong> 'CSV로 저장' 버튼을 클릭하면 엑셀에서 열 수 있는 파일로 저장됩니다</li>
-                </ol>
-                <div style="margin-top: 20px; padding: 15px; background: #e7f3ff; border-left: 4px solid #2196f3;">
-                    <strong>💡 실제 크롤링 사용법:</strong><br>
-                    1. GitHub에서 코드 다운로드<br>
-                    2. <code>pip install -r requirements.txt</code> 실행<br>
-                    3. <code>playwright install chromium</code> 실행<br>
-                    4. 로컬에서 <code>python naver_map_crawler.py</code> 실행
-                </div>
+                <div id="batchCheckResults"></div>
             </div>
         </div>
     </div>
 
     <script>
         let currentResults = [];
-        let currentKeyword = '';
 
+        // 탭 전환
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+                
+                // 모든 탭 버튼 비활성화
+                document.querySelectorAll('.tab-button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // 모든 탭 컨텐츠 숨기기
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // 선택된 탭 활성화
+                button.classList.add('active');
+                document.getElementById(`tab-${tabName}`).classList.add('active');
+            });
+        });
+
+        // 플레이스 탭 확인
+        async function checkPlaceTab() {
+            const keyword = document.getElementById('placeCheckKeyword').value.trim();
+            
+            if (!keyword) {
+                alert('키워드를 입력해주세요.');
+                return;
+            }
+
+            const loading = document.getElementById('placeCheckLoading');
+            const resultDiv = document.getElementById('placeCheckResult');
+            
+            loading.classList.add('active');
+            resultDiv.innerHTML = '';
+
+            try {
+                const response = await fetch('/check-place-tab', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ keyword })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const result = data.result;
+                    const hasTab = result.has_place_tab;
+                    
+                    resultDiv.innerHTML = `
+                        <div class="place-tab-info active ${hasTab ? 'has-tab' : 'no-tab'}">
+                            <h3>${hasTab ? '✅' : '❌'} ${result.message}</h3>
+                            <p style="margin-top: 10px;">키워드: <strong>${result.keyword}</strong></p>
+                            <p>신뢰도: <strong>${result.confidence}</strong></p>
+                        </div>
+                    `;
+                } else {
+                    alert('오류: ' + data.error);
+                }
+            } catch (error) {
+                alert('오류가 발생했습니다: ' + error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // 일괄 키워드 검증
+        async function batchCheckPlaceTabs() {
+            const keywordsText = document.getElementById('batchKeywords').value.trim();
+            
+            if (!keywordsText) {
+                alert('키워드를 입력해주세요.');
+                return;
+            }
+
+            const keywords = keywordsText.split('\n').map(k => k.trim()).filter(k => k);
+
+            if (keywords.length === 0) {
+                alert('유효한 키워드를 입력해주세요.');
+                return;
+            }
+
+            const loading = document.getElementById('batchCheckLoading');
+            const resultsDiv = document.getElementById('batchCheckResults');
+            
+            loading.classList.add('active');
+            resultsDiv.innerHTML = '';
+
+            try {
+                const response = await fetch('/batch-check', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ keywords })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const total = data.total;
+                    const hasTabCount = data.has_place_tab_count;
+                    const noTabCount = total - hasTabCount;
+
+                    let html = `
+                        <div class="statistics">
+                            <div class="stat-card">
+                                <h3>${total}</h3>
+                                <p>총 키워드</p>
+                            </div>
+                            <div class="stat-card success">
+                                <h3>${hasTabCount}</h3>
+                                <p>플레이스 탭 있음</p>
+                            </div>
+                            <div class="stat-card warning">
+                                <h3>${noTabCount}</h3>
+                                <p>플레이스 탭 없음</p>
+                            </div>
+                        </div>
+                        <div class="batch-results">
+                            <h3 style="margin-bottom: 15px;">검증 결과</h3>
+                    `;
+
+                    data.results.forEach(result => {
+                        const hasTab = result.has_place_tab;
+                        html += `
+                            <div class="batch-result-item ${hasTab ? 'has-tab' : 'no-tab'}">
+                                <div>
+                                    <div class="batch-result-keyword">${result.keyword}</div>
+                                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                        ${result.message}
+                                    </div>
+                                </div>
+                                <div class="batch-result-status ${hasTab ? 'success' : 'danger'}">
+                                    ${hasTab ? '✅ 표시됨' : '❌ 없음'}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div>';
+                    resultsDiv.innerHTML = html;
+                } else {
+                    alert('오류: ' + data.error);
+                }
+            } catch (error) {
+                alert('오류가 발생했습니다: ' + error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // 장소 검색
         async function searchPlaces() {
             const keyword = document.getElementById('keyword').value.trim();
             const maxResults = parseInt(document.getElementById('maxResults').value);
 
             if (!keyword) {
-                showError('검색어를 입력해주세요.');
+                alert('검색어를 입력해주세요.');
                 return;
             }
 
-            if (maxResults < 1 || maxResults > 100) {
-                showError('결과 수는 1~100 사이여야 합니다.');
-                return;
-            }
-
-            currentKeyword = keyword;
-            document.getElementById('loading').classList.add('active');
-            document.getElementById('resultsSection').classList.remove('active');
-            document.getElementById('error').innerHTML = '';
+            const loading = document.getElementById('searchLoading');
+            const results = document.getElementById('searchResults');
+            const placeTabInfo = document.getElementById('placeTabInfo');
+            
+            loading.classList.add('active');
+            results.classList.remove('active');
+            placeTabInfo.classList.remove('active');
 
             try {
                 const response = await fetch('/search', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        keyword: keyword,
-                        max_results: maxResults
-                    })
+                    body: JSON.stringify({ keyword, max_results: maxResults })
                 });
 
                 const data = await response.json();
 
-                if (data.error) {
-                    showError(data.error);
-                    return;
+                if (data.success) {
+                    currentResults = data.results;
+                    
+                    // 플레이스 탭 정보 표시
+                    const tabInfo = data.place_tab_info;
+                    const hasTab = tabInfo.has_place_tab;
+                    placeTabInfo.className = `place-tab-info active ${hasTab ? 'has-tab' : 'no-tab'}`;
+                    placeTabInfo.innerHTML = `
+                        <strong>${hasTab ? '✅' : '❌'} ${tabInfo.message}</strong>
+                    `;
+
+                    // 통계 표시
+                    const stats = data.statistics;
+                    document.getElementById('statistics').innerHTML = `
+                        <div class="stat-card">
+                            <h3>${stats.total}</h3>
+                            <p>총 결과</p>
+                        </div>
+                        <div class="stat-card success">
+                            <h3>${stats.main_places}</h3>
+                            <p>주업체</p>
+                        </div>
+                        <div class="stat-card warning">
+                            <h3>${stats.other_region_places}</h3>
+                            <p>타지역업체</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>${stats.other_region_ratio}</h3>
+                            <p>타지역업체 비율</p>
+                        </div>
+                    `;
+
+                    displayResults(data.results);
+                    document.getElementById('exportBtn').disabled = false;
+                } else {
+                    alert('오류: ' + data.error);
                 }
-
-                currentResults = data.results;
-                displayResults(data.results, data.count);
-
             } catch (error) {
-                showError('검색 중 오류가 발생했습니다: ' + error.message);
+                alert('오류가 발생했습니다: ' + error.message);
             } finally {
-                document.getElementById('loading').classList.remove('active');
+                loading.classList.remove('active');
             }
         }
 
-        function displayResults(results, count) {
-            const resultsSection = document.getElementById('resultsSection');
+        function displayResults(results) {
+            const resultsSection = document.getElementById('searchResults');
             const resultsGrid = document.getElementById('resultsGrid');
-            const resultsCount = document.getElementById('resultsCount');
+            const resultCount = document.getElementById('resultCount');
 
-            if (count === 0) {
-                showError('검색 결과가 없습니다.');
+            if (results.length === 0) {
+                resultsGrid.innerHTML = '<p style="text-align: center; padding: 40px; color: #999;">검색 결과가 없습니다.</p>';
+                resultsSection.classList.add('active');
                 return;
             }
 
-            resultsCount.textContent = `총 ${count}개의 장소를 찾았습니다`;
-            resultsGrid.innerHTML = '';
-
-            results.forEach(place => {
-                const card = document.createElement('div');
-                card.className = 'place-card';
+            resultCount.textContent = results.length;
+            
+            resultsGrid.innerHTML = results.map(place => {
+                const isOtherRegion = place.is_other_region || false;
+                const placeType = place.place_type || '주업체';
                 
-                let ratingHTML = '';
-                if (place.rating) {
-                    ratingHTML = `
-                        <div class="place-rating">
-                            <span class="rating-star">⭐</span>
-                            <span class="rating-value">${place.rating}</span>
-                            ${place.reviews ? `<span class="review-count">(${place.reviews})</span>` : ''}
+                return `
+                    <div class="place-card ${isOtherRegion ? 'other-region' : ''}">
+                        <div class="place-type-badge ${isOtherRegion ? 'other' : 'main'}">
+                            ${placeType}
                         </div>
-                    `;
-                }
-
-                card.innerHTML = `
-                    <div class="place-name">${place.name || '정보 없음'}</div>
-                    ${place.category ? `<span class="place-category">${place.category}</span>` : ''}
-                    <div class="place-info">
-                        ${place.address ? `
-                            <div class="place-info-item">
-                                <strong>📍 주소:</strong>
-                                <span>${place.address}</span>
+                        <h3>${place.name}</h3>
+                        <div class="category">${place.category}</div>
+                        <div class="info">
+                            <strong>📍 주소:</strong>
+                            <span>${place.address}</span>
+                        </div>
+                        <div class="info">
+                            <strong>📞 전화:</strong>
+                            <span>${place.phone}</span>
+                        </div>
+                        ${place.rating ? `
+                            <div class="rating">
+                                <span class="rating-star">⭐</span>
+                                <strong>${place.rating}</strong>
+                                <span style="color: #999;">(리뷰 ${place.reviews}개)</span>
                             </div>
-                        ` : ''}
-                        ${place.phone ? `
-                            <div class="place-info-item">
-                                <strong>📞 전화:</strong>
-                                <span>${place.phone}</span>
-                            </div>
-                        ` : ''}
+                        ` : '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0; color: #999; font-size: 0.9em;">평점 정보 없음</div>'}
                     </div>
-                    ${ratingHTML}
                 `;
-                
-                resultsGrid.appendChild(card);
-            });
+            }).join('');
 
             resultsSection.classList.add('active');
         }
 
         async function exportToCSV() {
             if (currentResults.length === 0) {
-                showError('저장할 데이터가 없습니다.');
+                alert('저장할 데이터가 없습니다.');
                 return;
             }
+
+            const keyword = document.getElementById('keyword').value.trim();
 
             try {
                 const response = await fetch('/export', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
+                    body: JSON.stringify({ 
                         results: currentResults,
-                        keyword: currentKeyword
+                        keyword: keyword
                     })
                 });
 
                 const data = await response.json();
 
-                if (data.error) {
-                    showError(data.error);
-                    return;
+                if (data.success) {
+                    window.location.href = '/download/' + data.filename;
+                } else {
+                    alert('오류: ' + data.error);
                 }
-
-                // 파일 다운로드
-                window.location.href = `/download/${data.filename}`;
-                showInfo('CSV 파일이 저장되었습니다!');
-
             } catch (error) {
-                showError('파일 저장 중 오류가 발생했습니다: ' + error.message);
+                alert('오류가 발생했습니다: ' + error.message);
             }
         }
 
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.innerHTML = `<div class="alert alert-danger">${message}</div>`;
-        }
-
-        function showInfo(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.innerHTML = `<div class="alert alert-info">${message}</div>`;
-            setTimeout(() => {
-                errorDiv.innerHTML = '';
-            }, 3000);
-        }
-
-        // Enter 키로 검색
-        document.getElementById('keyword').addEventListener('keypress', function(e) {
+        // Enter 키 이벤트
+        document.getElementById('keyword').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 searchPlaces();
+            }
+        });
+
+        document.getElementById('placeCheckKeyword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                checkPlaceTab();
             }
         });
     </script>
