@@ -1,0 +1,64 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  네이버 플레이스 크롤링 앱 - 빠른 시작 가이드
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 5분 안에 실행하기!
+
+1️⃣ Python 설치되어 있나요?
+   명령 프롬프트(CMD) 또는 터미널에서:
+   
+   python --version
+   
+   (없으면 https://python.org 에서 다운로드)
+
+2️⃣ 프로젝트 폴더 만들기
+   
+   윈도우:
+   cd Desktop
+   mkdir naver_place_crawler
+   cd naver_place_crawler
+   
+   맥/리눅스:
+   cd ~/Desktop
+   mkdir naver_place_crawler
+   cd naver_place_crawler
+
+3️⃣ 파일들을 이 폴더에 넣기
+   - naver_map_crawler.py
+   - naver_place_crawler_real.py
+   - templates 폴더 (index.html 포함)
+   - requirements.txt
+
+4️⃣ 패키지 설치 (한 줄씩 실행)
+   
+   pip install flask playwright
+   playwright install chromium
+
+5️⃣ 앱 실행
+   
+   python naver_map_crawler.py
+
+6️⃣ 브라우저에서 열기
+   
+   http://localhost:5004
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 성공 확인:
+   - 화면 상단에 "🟢 실제 크롤링 모드" 표시
+   - "강남역 맛집" 검색하면 실제 네이버 데이터 표시
+
+❌ 문제 발생:
+   1. Python 명령어가 안 되면 → python3 사용
+   2. pip 안 되면 → pip3 또는 python -m pip 사용
+   3. 포트 충돌 → 파일에서 5004를 5005로 변경
+   4. 오류 메시지 복사해서 검색 또는 문의
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 팁:
+   - 검색어: "강남역 맛집", "홍대 카페", "하수구역빌"
+   - CSV 저장으로 엑셀에서 바로 열기 가능
+   - 타지역업체(070번호)가 주황색으로 표시됨
+
+🎉 실제 네이버 플레이스 데이터를 마음껏 수집하세요!
