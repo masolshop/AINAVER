@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>네이버 지도 크롤링 앱</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .search-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .results-header h2 {
+            color: #333;
+        }
+
+        .results-count {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .place-card {
+            background: white;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .place-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .place-name {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .place-category {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-bottom: 15px;
+        }
+
+        .place-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .place-info-item {
+            display: flex;
+            align-items: flex-start;
+            font-size: 0.95em;
+            color: #666;
+        }
+
+        .place-info-item strong {
+            min-width: 70px;
+            color: #333;
+        }
+
+        .place-rating {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        .rating-star {
+            color: #ffc107;
+            font-size: 1.2em;
+        }
+
+        .rating-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .review-count {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .instructions {
+            background: #e7f3ff;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 30px;
+            border-left: 5px solid #667eea;
+        }
+
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 1.8;
+            color: #555;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .search-form {
+                flex-direction: column;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ 네이버 지도 크롤링 앱</h1>
+            <p>원하는 장소를 검색하고 정보를 쉽게 수집하세요</p>
+        </div>
+
+        <div class="content">
+            <div class="search-section">
+                <div class="search-form">
+                    <div class="input-group">
+                        <label for="keyword">검색어</label>
+                        <input type="text" id="keyword" placeholder="예: 강남역 맛집, 홍대 카페" />
+                    </div>
+                    <div class="input-group">
+                        <label for="maxResults">최대 결과 수</label>
+                        <input type="number" id="maxResults" value="20" min="1" max="100" />
+                    </div>
+                    <div class="input-group" style="display: flex; align-items: flex-end;">
+                        <button class="btn btn-primary" onclick="searchPlaces()">🔍 검색</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>검색 중입니다... 잠시만 기다려주세요.</p>
+            </div>
+
+            <div id="error"></div>
+
+            <div class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <div>
+                        <h2>검색 결과</h2>
+                        <span class="results-count" id="resultsCount"></span>
+                    </div>
+                    <button class="btn btn-success" onclick="exportToCSV()">📥 CSV로 저장</button>
+                </div>
+                <div class="results-grid" id="resultsGrid"></div>
+            </div>
+
+            <div class="instructions">
+                <h3>📖 사용 방법</h3>
+                <ol>
+                    <li><strong>검색어 입력:</strong> 찾고 싶은 장소를 입력하세요 (예: "강남역 맛집", "홍대 카페")</li>
+                    <li><strong>결과 수 설정:</strong> 가져올 최대 결과 개수를 설정하세요 (1~100개)</li>
+                    <li><strong>검색 실행:</strong> '검색' 버튼을 클릭하면 자동으로 데이터를 수집합니다</li>
+                    <li><strong>결과 확인:</strong> 장소명, 주소, 전화번호, 평점 등의 정보를 확인하세요</li>
+                    <li><strong>저장:</strong> 'CSV로 저장' 버튼을 클릭하면 엑셀에서 열 수 있는 파일로 저장됩니다</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentResults = [];
+        let currentKeyword = '';
+
+        async function searchPlaces() {
+            const keyword = document.getElementById('keyword').value.trim();
+            const maxResults = parseInt(document.getElementById('maxResults').value);
+
+            if (!keyword) {
+                showError('검색어를 입력해주세요.');
+                return;
+            }
+
+            if (maxResults < 1 || maxResults > 100) {
+                showError('결과 수는 1~100 사이여야 합니다.');
+                return;
+            }
+
+            currentKeyword = keyword;
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('error').innerHTML = '';
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        keyword: keyword,
+                        max_results: maxResults
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                currentResults = data.results;
+                displayResults(data.results, data.count);
+
+            } catch (error) {
+                showError('검색 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function displayResults(results, count) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsGrid = document.getElementById('resultsGrid');
+            const resultsCount = document.getElementById('resultsCount');
+
+            if (count === 0) {
+                showError('검색 결과가 없습니다.');
+                return;
+            }
+
+            resultsCount.textContent = `총 ${count}개의 장소를 찾았습니다`;
+            resultsGrid.innerHTML = '';
+
+            results.forEach(place => {
+                const card = document.createElement('div');
+                card.className = 'place-card';
+                
+                let ratingHTML = '';
+                if (place.rating) {
+                    ratingHTML = `
+                        <div class="place-rating">
+                            <span class="rating-star">⭐</span>
+                            <span class="rating-value">${place.rating}</span>
+                            ${place.reviews ? `<span class="review-count">(${place.reviews})</span>` : ''}
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="place-name">${place.name || '정보 없음'}</div>
+                    ${place.category ? `<span class="place-category">${place.category}</span>` : ''}
+                    <div class="place-info">
+                        ${place.address ? `
+                            <div class="place-info-item">
+                                <strong>📍 주소:</strong>
+                                <span>${place.address}</span>
+                            </div>
+                        ` : ''}
+                        ${place.phone ? `
+                            <div class="place-info-item">
+                                <strong>📞 전화:</strong>
+                                <span>${place.phone}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${ratingHTML}
+                `;
+                
+                resultsGrid.appendChild(card);
+            });
+
+            resultsSection.classList.add('active');
+        }
+
+        async function exportToCSV() {
+            if (currentResults.length === 0) {
+                showError('저장할 데이터가 없습니다.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/export', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        results: currentResults,
+                        keyword: currentKeyword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                // 파일 다운로드
+                window.location.href = `/download/${data.filename}`;
+                showInfo('CSV 파일이 저장되었습니다!');
+
+            } catch (error) {
+                showError('파일 저장 중 오류가 발생했습니다: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.innerHTML = `<div class="alert alert-danger">${message}</div>`;
+        }
+
+        function showInfo(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.innerHTML = `<div class="alert alert-info">${message}</div>`;
+            setTimeout(() => {
+                errorDiv.innerHTML = '';
+            }, 3000);
+        }
+
+        // Enter 키로 검색
+        document.getElementById('keyword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchPlaces();
+            }
+        });
+    </script>
+</body>
+</html>
