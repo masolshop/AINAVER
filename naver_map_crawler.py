@@ -148,12 +148,13 @@ class NaverMapCrawler:
         
         if is_other_region:
             # 타지역업체: 동/구 단위 주소, 070번호, 키워드 포함 상호명
-            if business_keyword and random.random() < 0.8:  # 80% 확률로 키워드 포함
-                # "홍대맛집배달", "강남카페전문점" 등
-                suffixes = ['배달', '전문점', '할인', '24시', '예약', '추천', '인기', '맛집']
+            if business_keyword:
+                # "홍대맛집배달", "강남카페전문점", "하수구역빌전문" 등
+                suffixes = ['배달', '전문점', '할인', '24시', '예약', '추천', '인기', '전문', '서비스', '업체']
                 short_name = f"{location}{business_keyword}{random.choice(suffixes)}"
             else:
-                short_name = name_base[:10] if len(name_base) > 10 else name_base
+                # 키워드가 없으면 검색어 자체를 사용
+                short_name = f"{keyword}{random.choice(['배달', '전문', '서비스'])}"
             
             place_data = {
                 'name': short_name,
@@ -181,21 +182,35 @@ class NaverMapCrawler:
         return place_data
     
     def _extract_business_keyword(self, keyword):
-        """키워드에서 업종 키워드 추출"""
+        """키워드에서 업종 키워드 추출 (없으면 키워드 전체 사용)"""
         business_keywords = [
             '맛집', '카페', '치킨', '피자', '족발', '보쌈', '삼겹살', '고기', 
             '중식', '일식', '양식', '한식', '분식', '회', '초밥',
             '병원', '의원', '한의원', '치과', '피부과', '안과', '정형외과',
             '약국', '편의점', '미용실', '네일샵', '헬스장', '필라테스',
             '학원', '독서실', 'PC방', '노래방', '찜질방',
-            '숙박', '호텔', '모텔', '게스트하우스', '펜션'
+            '숙박', '호텔', '모텔', '게스트하우스', '펜션',
+            '역빌', '빌라', '오피스텔', '원룸', '투룸',
+            '수리', '청소', '세탁', '정비', '설치'
         ]
         
         for biz_keyword in business_keywords:
             if biz_keyword in keyword:
                 return biz_keyword
         
-        return None
+        # 업종 키워드가 없으면 지역명을 제거한 나머지를 사용
+        # 예: "하수구역빌" → "역빌" (지역명 제거 후)
+        locations = ['강남', '홍대', '신촌', '명동', '이태원', '여의도', '잠실', '건대', '신림', '수원', '판교', '분당', '역삼', '선릉', '서초', '하수구']
+        keyword_clean = keyword
+        for loc in locations:
+            keyword_clean = keyword_clean.replace(loc, '')
+        
+        # 남은 키워드가 있으면 사용
+        if keyword_clean and len(keyword_clean) > 0:
+            return keyword_clean.strip()
+        
+        # 그것도 없으면 원본 키워드 사용
+        return keyword
     
     def close(self):
         """데모 모드에서는 아무것도 하지 않음"""
