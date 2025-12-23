@@ -168,8 +168,24 @@ class NaverMapCrawler:
             }
         else:
             # 주업체: 상세주소, 일반번호, 평점/리뷰 있음
+            # 검색 키워드를 반영한 상호명 생성
+            if business_keyword:
+                # 업종 키워드가 있으면 관련 업체명 생성
+                # 예: "역빌" -> "하수구 역빌센터", "역빌매매 하수구점"
+                name_patterns = [
+                    f"{location} {business_keyword}센터",
+                    f"{business_keyword}매매 {location}점",
+                    f"{location}{business_keyword}",
+                    f"{business_keyword} {location}지점",
+                    f"{location} {business_keyword}상담소"
+                ]
+                main_name = random.choice(name_patterns)
+            else:
+                # 키워드가 특수한 경우 검색어 자체를 사용
+                main_name = f"{keyword} {location}점" if index % 2 == 0 else f"{location} {keyword}"
+            
             place_data = {
-                'name': f"{location} {name_base}" if index % 3 == 0 else f"{name_base} {location}점",
+                'name': main_name,
                 'category': category,
                 'address': f"서울특별시 {location}{random.choice(dong_list)} {random.choice(street_list)} {random.randint(1, 500)}",
                 'phone': f"{random.choice(template['phone_prefix'])}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
