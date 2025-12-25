@@ -1,2 +1,5 @@
-flask==3.0.0
-# playwright==1.40.0  # 로컬에서 실제 크롤링 시 필요
+streamlit==1.29.0
+pandas==2.1.3
+openpyxl==3.1.2
+playwright==1.40.0
+nest-asyncio==1.5.8
