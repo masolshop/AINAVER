@@ -14,7 +14,15 @@ class NaverPlaceCrawler:
     """네이버 플레이스 크롤러"""
     
     def __init__(self):
+        # 데스크톱 User-Agent로 변경 (더 안정적)
         self.user_agent = (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/120.0.0.0 Safari/537.36'
+        )
+        
+        # 모바일 User-Agent (백업용)
+        self.mobile_user_agent = (
             'Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) '
             'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 '
             'Mobile/15E148 Safari/604.1'
@@ -55,8 +63,7 @@ class NaverPlaceCrawler:
             
                 context = await browser.new_context(
                     user_agent=self.user_agent,
-                    viewport={'width': 375, 'height': 667},
-                    device_scale_factor=2,
+                    viewport={'width': 1920, 'height': 1080},  # 데스크톱 해상도
                     locale='ko-KR',
                     timezone_id='Asia/Seoul'
                 )
@@ -74,11 +81,13 @@ class NaverPlaceCrawler:
                 print("✓ 새 페이지 생성 성공")
                 
                 try:
-                    # 네이버 플레이스 검색
+                    # 네이버 플레이스 검색 - 데스크톱 URL 시도
                     import urllib.parse
                     encoded_keyword = urllib.parse.quote(keyword)
-                    search_url = f"https://m.place.naver.com/search?query={encoded_keyword}"
-                    print(f"→ 검색 URL: {search_url}")
+                    
+                    # 모바일 대신 데스크톱 URL 사용
+                    search_url = f"https://map.naver.com/p/search/{encoded_keyword}"
+                    print(f"→ 검색 URL (데스크톱): {search_url}")
                     
                     # 페이지 로드 - networkidle 대기
                     await page.goto(search_url, wait_until="networkidle", timeout=30000)
@@ -147,19 +156,29 @@ class NaverPlaceCrawler:
             # 플레이스 아이템 찾기 - 여러 셀렉터 시도
             print("  → 셀렉터로 아이템 찾는 중...")
             
-            # 시도할 모든 셀렉터
+            # 시도할 모든 셀렉터 (모바일 + 데스크톱)
             selectors = [
+                # 데스크톱 셀렉터 (우선)
+                ('.Ryr1F', '.Ryr1F (데스크톱 아이템)'),
+                ('.CHC5F', '.CHC5F (데스크톱 리스트)'),
+                ('.place_bluelink', '.place_bluelink'),
+                ('li.VLTHu', 'li.VLTHu'),
+                ('div.ULb0v', 'div.ULb0v'),
+                
+                # 모바일 셀렉터
                 ('li[data-index]', 'li[data-index]'),
                 ('.item_inner', '.item_inner'),
                 ('[class*="place"]', '[class*="place"]'),
                 ('.UEzoS', '.UEzoS'),
                 ('.place_item', '.place_item'),
                 ('.PlaceItem', '.PlaceItem'),
+                
+                # 일반 셀렉터
                 ('div[class*="item"]', 'div[class*="item"]'),
                 ('article', 'article'),
                 ('.search_item', '.search_item'),
                 ('li', 'li (모두)'),
-                ('div', 'div (모두)'),
+                ('a', 'a (모두)'),
             ]
             
             items = []
