@@ -186,10 +186,9 @@ class NaverPlaceCrawler:
             # 시도할 모든 셀렉터 (iframe 내부용)
             selectors = [
                 # PC 데스크톱 검색 결과 (pcmap.place.naver.com/place/list)
+                ('li.VLTHu', 'li.VLTHu (PC 검색 결과 리스트)'),  # 최우선
                 ('li.UEzoS', 'li.UEzoS (PC 검색 결과)'),
                 ('ul.place_section_content > li', 'ul.place_section_content > li'),
-                ('.Ryr1F', '.Ryr1F (데스크톱 아이템)'),
-                ('li.VLTHu', 'li.VLTHu'),
                 ('.place_list li', '.place_list li'),
                 
                 # 모바일 검색 결과
@@ -203,13 +202,30 @@ class NaverPlaceCrawler:
             ]
             
             items = []
+            max_found = 0
+            selected_selector_name = ""
+            
+            # 모든 셀렉터를 시도하고 가장 많은 아이템을 찾은 것 선택
             for selector, name in selectors:
                 found = await page.query_selector_all(selector)
                 print(f"  → {name}: {len(found)}개")
-                if found and not items:
+                
+                # 최소 3개 이상이고, 이전보다 많으면 업데이트
+                if len(found) >= 3 and len(found) > max_found:
                     items = found
-                    print(f"  ✅ 사용할 셀렉터: {name}")
+                    max_found = len(found)
+                    selected_selector_name = name
             
+            # 3개 미만이면 첫 번째로 발견한 것 사용
+            if not items:
+                for selector, name in selectors:
+                    found = await page.query_selector_all(selector)
+                    if found:
+                        items = found
+                        selected_selector_name = name
+                        break
+            
+            print(f"  ✅ 사용할 셀렉터: {selected_selector_name}")
             print(f"  ✅ 최종 발견된 아이템 수: {len(items)}")
             
             # 각 아이템에서 정보 추출
