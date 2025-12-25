@@ -325,10 +325,10 @@ class NaverPlaceCrawler:
                             '[class*="address"]'
                         ])
                     
-                    # 전화번호 추출
+                    # 전화번호 추출 - 상세 페이지 클릭 필요
                     phone = ""
                     
-                    # 1) tel: 링크에서 우선 추출
+                    # 1) 리스트에서 tel: 링크 시도
                     tel_link = await item.query_selector('a[href^="tel:"]')
                     if tel_link:
                         href = await tel_link.get_attribute('href')
@@ -337,36 +337,57 @@ class NaverPlaceCrawler:
                             if idx < 3:
                                 print(f"      → tel: 링크에서 전화번호: '{phone}'")
                     
-                    # 2) HTML에서 정규식으로 전화번호 찾기
+                    # 2) 리스트에 없으면 상세 페이지 열기
                     if not phone:
-                        html = await item.inner_html()
-                        # 070 우선, 하이픈 필수 (날짜 제외)
-                        phone_patterns = [
-                            r'(070[-]\d{3,4}[-]\d{4})',  # 070-xxxx-xxxx
-                            r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',  # 0xx-xxxx-xxxx
-                            r'(1\d{3}[-]\d{4})',  # 1xxx-xxxx (대표번호)
-                        ]
-                        for pattern in phone_patterns:
-                            match = re.search(pattern, html)
-                            if match:
-                                phone = match.group(1)
-                                # 날짜 형식 제외 (20250204 같은 것)
-                                if not re.match(r'^\d{8}$', phone.replace('-', '')):
-                                    if idx < 3:
-                                        print(f"      → 정규식으로 전화번호 발견: '{phone}'")
-                                    break
-                                else:
-                                    phone = ""  # 날짜면 무효화
-                    
-                    # 3) 셀렉터로 시도
-                    if not phone:
-                        phone = await self._get_text(item, [
-                            '.MPGxf',
-                            'span.MPGxf',
-                            '.dry6Z',
-                            '[class*="phone"]',
-                            '[class*="tel"]'
-                        ])
+                        try:
+                            # 업체 링크 클릭
+                            place_link = await item.query_selector('a.place_bluelink')
+                            if place_link:
+                                if idx < 3:
+                                    print(f"      → 상세 페이지 열기 시도...")
+                                await place_link.click()
+                                await asyncio.sleep(2)  # 상세 페이지 로드 대기
+                                
+                                # 상세 페이지에서 전화번호 찾기
+                                # 새로운 iframe 확인
+                                detail_frames = page.frames
+                                for frame in detail_frames:
+                                    if 'place/home' in frame.url:
+                                        # 상세 페이지 iframe 발견
+                                        await asyncio.sleep(1)
+                                        detail_html = await frame.content()
+                                        
+                                        # tel: 링크 찾기
+                                        tel_match = re.search(r'href="tel:([0-9\-]+)"', detail_html)
+                                        if tel_match:
+                                            phone = tel_match.group(1).strip()
+                                            if idx < 3:
+                                                print(f"      → 상세 페이지에서 전화번호: '{phone}'")
+                                            break
+                                        
+                                        # 정규식으로 찾기
+                                        if not phone:
+                                            phone_patterns = [
+                                                r'(070[-]\d{3,4}[-]\d{4})',
+                                                r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
+                                                r'(1\d{3}[-]\d{4})',
+                                            ]
+                                            for pattern in phone_patterns:
+                                                match = re.search(pattern, detail_html)
+                                                if match:
+                                                    phone = match.group(1)
+                                                    if not re.match(r'^\d{8}$', phone.replace('-', '')):
+                                                        if idx < 3:
+                                                            print(f"      → 상세 페이지 정규식: '{phone}'")
+                                                        break
+                                        break
+                                
+                                # 뒤로 가기
+                                await page.go_back()
+                                await asyncio.sleep(1)
+                        except Exception as e:
+                            if idx < 3:
+                                print(f"      ⚠️ 상세 페이지 열기 실패: {str(e)}")
                     
                     # 평점
                     rating = await self._get_text(item, ['.h69bs', '[class*="rating"]', '[class*="star"]'])
