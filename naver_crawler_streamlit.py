@@ -97,8 +97,26 @@ class NaverPlaceCrawler:
                     await asyncio.sleep(5)
                     print("✓ JavaScript 실행 대기 완료")
                     
-                    # 검색 결과 추출
-                    results = await self._extract_results(page, keyword, max_results)
+                    # iframe 확인
+                    frames = page.frames
+                    print(f"→ 발견된 iframe 수: {len(frames)}")
+                    for i, frame in enumerate(frames):
+                        print(f"  Frame {i}: {frame.url[:100]}")
+                    
+                    # searchIframe 찾기
+                    search_frame = None
+                    for frame in frames:
+                        if 'searchIframe' in frame.url or 'search' in frame.url.lower():
+                            search_frame = frame
+                            print(f"✓ 검색 iframe 발견: {frame.url}")
+                            break
+                    
+                    # iframe이 있으면 그 안에서 추출, 없으면 메인 페이지에서 추출
+                    if search_frame:
+                        results = await self._extract_results(search_frame, keyword, max_results)
+                    else:
+                        print("⚠️ 검색 iframe 없음, 메인 페이지에서 추출 시도")
+                        results = await self._extract_results(page, keyword, max_results)
                     
                     print(f"✓ 최종 결과: {len(results)}개 추출")
                     return results
@@ -156,29 +174,27 @@ class NaverPlaceCrawler:
             # 플레이스 아이템 찾기 - 여러 셀렉터 시도
             print("  → 셀렉터로 아이템 찾는 중...")
             
-            # 시도할 모든 셀렉터 (모바일 + 데스크톱)
+            # 시도할 모든 셀렉터 (iframe 내부용)
             selectors = [
-                # 데스크톱 셀렉터 (우선)
+                # iframe 내부 검색 결과 셀렉터
+                ('ul > li', 'ul > li (리스트 아이템)'),
+                ('.search_list > li', '.search_list > li'),
+                ('.place_list > li', '.place_list > li'),
+                ('li.search_item', 'li.search_item'),
+                
+                # 데스크톱 셀렉터
                 ('.Ryr1F', '.Ryr1F (데스크톱 아이템)'),
                 ('.CHC5F', '.CHC5F (데스크톱 리스트)'),
-                ('.place_bluelink', '.place_bluelink'),
                 ('li.VLTHu', 'li.VLTHu'),
                 ('div.ULb0v', 'div.ULb0v'),
                 
                 # 모바일 셀렉터
                 ('li[data-index]', 'li[data-index]'),
                 ('.item_inner', '.item_inner'),
-                ('[class*="place"]', '[class*="place"]'),
                 ('.UEzoS', '.UEzoS'),
-                ('.place_item', '.place_item'),
-                ('.PlaceItem', '.PlaceItem'),
                 
-                # 일반 셀렉터
-                ('div[class*="item"]', 'div[class*="item"]'),
-                ('article', 'article'),
-                ('.search_item', '.search_item'),
+                # 일반 (최후 수단)
                 ('li', 'li (모두)'),
-                ('a', 'a (모두)'),
             ]
             
             items = []
