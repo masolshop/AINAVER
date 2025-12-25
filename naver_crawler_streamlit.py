@@ -31,50 +31,79 @@ class NaverPlaceCrawler:
         Returns:
             크롤링 결과 리스트
         """
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-dev-shm-usage',
-                    '--no-sandbox',
-                ]
-            )
-            
-            context = await browser.new_context(
-                user_agent=self.user_agent,
-                viewport={'width': 375, 'height': 667},
-                device_scale_factor=2,
-                locale='ko-KR',
-                timezone_id='Asia/Seoul'
-            )
-            
-            # 봇 감지 우회 스크립트
-            await context.add_init_script("""
-                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-                Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR', 'ko']});
-            """)
-            
-            page = await context.new_page()
-            
-            try:
-                # 네이버 플레이스 검색
-                search_url = f"https://m.place.naver.com/search?query={keyword}"
-                await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                await asyncio.sleep(2)
+        print(f"\n{'='*60}")
+        print(f"🚀 크롤링 시작: '{keyword}'")
+        print(f"{'='*60}")
+        
+        try:
+            async with async_playwright() as p:
+                print("✓ Playwright 초기화 성공")
                 
-                # 검색 결과 추출
-                results = await self._extract_results(page, keyword, max_results)
-                
-                return results
-                
-            except Exception as e:
-                print(f"❌ 크롤링 오류: {str(e)}")
-                return []
+                try:
+                    browser = await p.chromium.launch(
+                        headless=True,
+                        args=[
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-dev-shm-usage',
+                            '--no-sandbox',
+                        ]
+                    )
+                    print("✓ Chromium 브라우저 실행 성공")
+                except Exception as launch_error:
+                    print(f"❌ 브라우저 실행 실패: {launch_error}")
+                    raise
             
-            finally:
-                await browser.close()
+                context = await browser.new_context(
+                    user_agent=self.user_agent,
+                    viewport={'width': 375, 'height': 667},
+                    device_scale_factor=2,
+                    locale='ko-KR',
+                    timezone_id='Asia/Seoul'
+                )
+                print("✓ 브라우저 컨텍스트 생성 성공")
+                
+                # 봇 감지 우회 스크립트
+                await context.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                    Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR', 'ko']});
+                """)
+                print("✓ 봇 우회 스크립트 추가 완료")
+                
+                page = await context.new_page()
+                print("✓ 새 페이지 생성 성공")
+                
+                try:
+                    # 네이버 플레이스 검색
+                    search_url = f"https://m.place.naver.com/search?query={keyword}"
+                    print(f"→ 검색 URL: {search_url}")
+                    
+                    await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
+                    print("✓ 페이지 로드 완료")
+                    
+                    await asyncio.sleep(2)
+                    
+                    # 검색 결과 추출
+                    results = await self._extract_results(page, keyword, max_results)
+                    
+                    print(f"✓ 최종 결과: {len(results)}개 추출")
+                    return results
+                    
+                except Exception as e:
+                    print(f"❌ 크롤링 오류: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    return []
+                
+                finally:
+                    await browser.close()
+                    print("✓ 브라우저 종료")
+                    
+        except Exception as outer_error:
+            print(f"❌ Playwright 실행 실패: {outer_error}")
+            import traceback
+            traceback.print_exc()
+            return []
     
     async def _extract_results(self, page, keyword: str, max_results: int) -> List[Dict]:
         """검색 결과 추출"""

@@ -12,23 +12,61 @@ import subprocess
 def install_playwright_browsers():
     """Playwright Chromium 브라우저 설치"""
     try:
-        result = subprocess.run(
+        # 1. playwright install chromium
+        print("🔧 Step 1: Installing Playwright Chromium...")
+        result1 = subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
             check=True,
             capture_output=True,
-            text=True
+            text=True,
+            timeout=300
         )
-        print("✅ Playwright 브라우저 설치 완료")
-        print(result.stdout)
+        print("✅ Chromium installed")
+        print(result1.stdout)
+        
+        # 2. playwright install-deps (시스템 의존성)
+        print("🔧 Step 2: Installing system dependencies...")
+        result2 = subprocess.run(
+            [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        print("✅ Dependencies installed")
+        print(result2.stdout)
+        
+        # 3. 설치 확인
+        print("🔧 Step 3: Verifying installation...")
+        import os
+        home_dir = os.path.expanduser("~")
+        playwright_dir = os.path.join(home_dir, ".cache", "ms-playwright")
+        if os.path.exists(playwright_dir):
+            print(f"✅ Playwright directory exists: {playwright_dir}")
+            for item in os.listdir(playwright_dir):
+                print(f"  - {item}")
+        else:
+            print(f"❌ Playwright directory not found: {playwright_dir}")
+        
         return True
+        
+    except subprocess.TimeoutExpired:
+        print("❌ Installation timeout (5분 초과)")
+        return False
     except Exception as e:
         print(f"❌ Playwright 설치 실패: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # 브라우저 설치 실행
-install_status = install_playwright_browsers()
+with st.spinner("🔧 Playwright 브라우저 설치 중... (최초 1회, 약 2분 소요)"):
+    install_status = install_playwright_browsers()
+
 if not install_status:
-    st.warning("⚠️ Playwright 브라우저 설치 중 문제가 발생했을 수 있습니다.")
+    st.error("❌ Playwright 브라우저 설치 실패")
+    st.info("💡 사이드바에서 '데모 모드'를 활성화하여 앱 기능을 테스트하세요.")
+else:
+    st.success("✅ Playwright 설치 완료!")
 
 # 페이지 설정
 st.set_page_config(
@@ -225,13 +263,30 @@ if start_button and keywords:
                     ]
                     st.info(f"🧪 '{keyword}': {len(results)}개 데모 데이터 생성 (실제 크롤링 아님)")
                 else:
-                    # 실제 크롤링
-                    crawler = NaverPlaceCrawler()
-                    results = asyncio.run(crawler.crawl(keyword, max_results=max_results))
+                    # 실제 크롤링 with 로그 캡처
+                    import io
+                    import sys
+                    
+                    # 표준 출력 캡처
+                    old_stdout = sys.stdout
+                    sys.stdout = log_buffer = io.StringIO()
+                    
+                    try:
+                        crawler = NaverPlaceCrawler()
+                        results = asyncio.run(crawler.crawl(keyword, max_results=max_results))
+                    finally:
+                        # 로그 복원
+                        sys.stdout = old_stdout
+                        log_output = log_buffer.getvalue()
+                    
+                    # 로그 표시
+                    if log_output:
+                        with st.expander(f"🔍 '{keyword}' 크롤링 로그 (클릭하여 보기)"):
+                            st.code(log_output, language="text")
                     
                     if not results:
                         st.warning(f"⚠️ '{keyword}': 결과 없음")
-                        st.info("💡 Playwright 문제가 있다면 사이드바에서 '데모 모드'를 활성화해보세요.")
+                        st.info("💡 위의 로그를 확인하거나, 사이드바에서 '데모 모드'를 활성화해보세요.")
                     else:
                         st.success(f"✅ '{keyword}': {len(results)}개 업체 추출")
                 
