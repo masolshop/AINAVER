@@ -103,13 +103,22 @@ class NaverPlaceCrawler:
                     for i, frame in enumerate(frames):
                         print(f"  Frame {i}: {frame.url[:100]}")
                     
-                    # searchIframe 찾기
+                    # searchIframe 찾기 - 실제 검색 결과가 있는 iframe
                     search_frame = None
                     for frame in frames:
-                        if 'searchIframe' in frame.url or 'search' in frame.url.lower():
+                        # pcmap.place.naver.com 또는 m.place.naver.com의 list URL
+                        if 'place.naver.com/place/list' in frame.url or 'searchIframe' in frame.name:
                             search_frame = frame
-                            print(f"✓ 검색 iframe 발견: {frame.url}")
+                            print(f"✓ 검색 결과 iframe 발견: {frame.url[:100]}...")
                             break
+                    
+                    # 못 찾았으면 URL에 'place'가 포함된 iframe 찾기
+                    if not search_frame:
+                        for frame in frames:
+                            if 'place.naver.com' in frame.url and frame.url != page.url:
+                                search_frame = frame
+                                print(f"✓ 플레이스 iframe 발견: {frame.url[:100]}...")
+                                break
                     
                     # iframe이 있으면 그 안에서 추출, 없으면 메인 페이지에서 추출
                     if search_frame:
@@ -176,24 +185,21 @@ class NaverPlaceCrawler:
             
             # 시도할 모든 셀렉터 (iframe 내부용)
             selectors = [
-                # iframe 모바일 검색 결과 (우선순위 높음)
-                ('ul.place_section_content > li', 'ul.place_section_content > li (모바일)'),
-                ('li._YwYLL', 'li._YwYLL (모바일 아이템)'),
-                ('li._3cEhe', 'li._3cEhe (모바일 아이템)'),
-                ('.place_section_content li', '.place_section_content li'),
+                # PC 데스크톱 검색 결과 (pcmap.place.naver.com/place/list)
+                ('li.UEzoS', 'li.UEzoS (PC 검색 결과)'),
+                ('ul.place_section_content > li', 'ul.place_section_content > li'),
+                ('.Ryr1F', '.Ryr1F (데스크톱 아이템)'),
+                ('li.VLTHu', 'li.VLTHu'),
+                ('.place_list li', '.place_list li'),
                 
-                # 모바일 일반
+                # 모바일 검색 결과
+                ('li._YwYLL', 'li._YwYLL (모바일)'),
                 ('li[data-index]', 'li[data-index]'),
                 ('.item_inner', '.item_inner'),
-                ('.UEzoS', '.UEzoS'),
                 
-                # 데스크톱 셀렉터
-                ('.Ryr1F', '.Ryr1F (데스크톱 아이템)'),
-                ('.CHC5F', '.CHC5F (데스크톱 리스트)'),
-                ('li.VLTHu', 'li.VLTHu'),
-                
-                # 일반 리스트 (최후 수단, UI 버튼 제외)
-                ('ul > li:not([role="button"])', 'ul > li (버튼 제외)'),
+                # 일반 (UI 요소 제외)
+                ('ul.place_list > li', 'ul.place_list > li'),
+                ('div[role="list"] > div', 'div[role="list"] > div'),
             ]
             
             items = []
@@ -217,19 +223,19 @@ class NaverPlaceCrawler:
                         print(f"    📄 첫 번째 아이템 HTML (처음 1000자):")
                         print(f"    {item_html[:1000]}")
                     
-                    # 상호명 - 모바일 iframe 우선
+                    # 상호명 - PC iframe (pcmap.place.naver.com) 우선
                     name = await self._get_text(item, [
+                        '.TYaxT',           # PC iframe 상호명
+                        'span.TYaxT',       # PC iframe
+                        'a.place_bluelink', # PC iframe 링크
+                        '.place_bluelink',  # PC
                         'a.YwYLL',          # 모바일 iframe
                         '.YwYLL',           # 모바일
-                        'a[class*="place"]', # 모바일
-                        '.place_bluelink',  # 데스크톱
-                        '.TYaxT',           # 데스크톱
-                        'a.place_bluelink', # 데스크톱
-                        'a.BwZrK',          # 모바일
+                        'a[class*="place"]',
                         '[class*="name"]',
-                        'a',                # 일반
+                        'a',
                         'span',
-                        'div.YwYLL'         # div로도 시도
+                        'div'
                     ])
                     
                     if not name or name == '':
@@ -240,27 +246,31 @@ class NaverPlaceCrawler:
                     
                     # 카테고리
                     category = await self._get_text(item, [
+                        '.YzBgS',           # PC iframe
+                        'span.YzBgS',       # PC iframe
                         '.KCMnt',           # 모바일 iframe
                         'span.KCMnt',       # 모바일
-                        '.YzBgS',           # 데스크톱
                         '[class*="category"]',
                         'span'
                     ])
                     
                     # 주소
                     addr = await self._get_text(item, [
-                        '.LDgIH',           # 모바일 iframe
-                        'span.LDgIH',       # 모바일
-                        '.IH4XH',           # 모바일 대체
+                        '.LDgIH',           # PC iframe / 모바일
+                        'span.LDgIH',       # PC iframe / 모바일
+                        '.IH4XH',           # 대체
+                        '.P8YyJ',           # PC iframe 주소
                         '[class*="addr"]',
                         '[class*="address"]',
                         'span'
                     ])
                     
-                    # 전화번호 - 여러 방법으로 시도
+                    # 전화번호 - PC iframe 우선
                     phone = await self._get_text(item, [
-                        'a[href^="tel:"]',
-                        '.dry6Z',
+                        '.MPGxf',           # PC iframe 전화번호
+                        'span.MPGxf',       # PC iframe
+                        'a[href^="tel:"]',  # tel 링크
+                        '.dry6Z',           # 모바일
                         '[class*="phone"]',
                         '[class*="tel"]',
                         'span'
