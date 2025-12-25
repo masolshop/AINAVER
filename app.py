@@ -5,6 +5,24 @@ import os
 from io import BytesIO
 from datetime import datetime
 import asyncio
+import subprocess
+
+# Playwright 브라우저 자동 설치 (최초 1회)
+@st.cache_resource
+def install_playwright_browsers():
+    """Playwright Chromium 브라우저 설치"""
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            check=True,
+            capture_output=True
+        )
+        return True
+    except:
+        return False
+
+# 브라우저 설치 실행
+install_playwright_browsers()
 
 # 페이지 설정
 st.set_page_config(
