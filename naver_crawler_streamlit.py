@@ -180,6 +180,14 @@ class NaverPlaceCrawler:
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await asyncio.sleep(0.5)
             
+            # HTML 전체 저장 (디버깅용)
+            full_html = await page.content()
+            import os
+            debug_file = "/tmp/naver_place_debug.html"
+            with open(debug_file, "w", encoding="utf-8") as f:
+                f.write(full_html)
+            print(f"  📝 전체 HTML 저장됨: {debug_file} ({len(full_html)} 문자)")
+            
             # 플레이스 아이템 찾기 - 여러 셀렉터 시도
             print("  → 셀렉터로 아이템 찾는 중...")
             
@@ -243,14 +251,21 @@ class NaverPlaceCrawler:
                     
                     # 디버깅: 아이템 HTML 출력 (첫 3개)
                     if idx < 3:
+                        # 외부 HTML (태그 포함)
+                        outer_html = await item.evaluate("el => el.outerHTML")
+                        print(f"    📄 [{idx+1}] 아이템 OUTER HTML (처음 300자):")
+                        print(f"    {outer_html[:300]}")
+                        
+                        # 내부 HTML
                         item_html = await item.inner_html()
                         print(f"    📄 [{idx+1}] 아이템 전체 HTML 길이: {len(item_html)} 문자")
                         print(f"    📄 [{idx+1}] 아이템 HTML (처음 800자):")
                         print(f"    {item_html[:800]}")
-                        # 상호명 위치 확인
-                        if 'YwYLL' in item_html:
-                            start = item_html.find('YwYLL')
-                            print(f"    → YwYLL 위치: {start}, 주변: {item_html[max(0,start-50):start+150]}")
+                        
+                        # 모든 YwYLL 찾기
+                        import re
+                        ywyll_matches = re.findall(r'<span class="YwYLL">([^<]+)</span>', item_html)
+                        print(f"    → 이 아이템 내 모든 YwYLL 텍스트: {ywyll_matches}")
                         print()
                     
                     # 상호명 - PC iframe (pcmap.place.naver.com) 우선
