@@ -305,16 +305,25 @@ class NaverPlaceCrawler:
                         'span'
                     ])
                     
-                    # 주소
-                    addr = await self._get_text(item, [
-                        '.LDgIH',           # PC iframe / 모바일
-                        'span.LDgIH',       # PC iframe / 모바일
-                        '.IH4XH',           # 대체
-                        '.P8YyJ',           # PC iframe 주소
-                        '[class*="addr"]',
-                        '[class*="address"]',
-                        'span'
-                    ])
+                    # 주소 - Pb4bU 클래스 사용
+                    addr = ""
+                    addr_elem = await item.query_selector('.Pb4bU')
+                    if addr_elem:
+                        addr = await addr_elem.inner_text()
+                        addr = addr.strip() if addr else ""
+                        if idx < 3:
+                            print(f"      → .Pb4bU 주소: '{addr}'")
+                    
+                    # 실패하면 다른 셀렉터 시도
+                    if not addr:
+                        addr = await self._get_text(item, [
+                            '.LDgIH',
+                            'span.LDgIH',
+                            '.IH4XH',
+                            '.P8YyJ',
+                            '[class*="addr"]',
+                            '[class*="address"]'
+                        ])
                     
                     # 전화번호 추출
                     phone = ""
@@ -331,19 +340,23 @@ class NaverPlaceCrawler:
                     # 2) HTML에서 정규식으로 전화번호 찾기
                     if not phone:
                         html = await item.inner_html()
-                        # 070 우선 (타지역 인터넷 전화)
+                        # 070 우선, 하이픈 필수 (날짜 제외)
                         phone_patterns = [
-                            r'(070[-\s]?\d{3,4}[-\s]?\d{4})',  # 070
-                            r'(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4})',  # 일반 지역번호
-                            r'(\d{4}[-\s]?\d{4})',  # 8자리
+                            r'(070[-]\d{3,4}[-]\d{4})',  # 070-xxxx-xxxx
+                            r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',  # 0xx-xxxx-xxxx
+                            r'(1\d{3}[-]\d{4})',  # 1xxx-xxxx (대표번호)
                         ]
                         for pattern in phone_patterns:
                             match = re.search(pattern, html)
                             if match:
                                 phone = match.group(1)
-                                if idx < 3:
-                                    print(f"      → 정규식으로 전화번호 발견: '{phone}'")
-                                break
+                                # 날짜 형식 제외 (20250204 같은 것)
+                                if not re.match(r'^\d{8}$', phone.replace('-', '')):
+                                    if idx < 3:
+                                        print(f"      → 정규식으로 전화번호 발견: '{phone}'")
+                                    break
+                                else:
+                                    phone = ""  # 날짜면 무효화
                     
                     # 3) 셀렉터로 시도
                     if not phone:
@@ -424,15 +437,16 @@ class NaverPlaceCrawler:
             return True  # 흥신소(3글자만) = 무조건 타지역
         
         # 2순위: 전화번호 070 = 무조건 타지역
-        if phone and phone != "-":
+        if phone and phone != "-" and phone != "전화번호 없음":
             # 070 번호 = 인터넷 전화 = 타지역
             if '070' in phone or phone.startswith('070'):
                 return True  # 타지역
             
-            # 그 외 모든 전화번호 = 메인
-            # 0507, 1509, 1688, 02, 031 등 → 모두 메인
+            # 유효한 전화번호가 있고 070이 아니면 메인
             if re.search(r'\d', phone):
                 return False  # 메인
+        
+        # 전화번호 없으면 타지역 (의심)
         
         # 3순위: 주소 기반 (번지수 있으면 메인)
         if addr and addr != "주소 정보 없음":
