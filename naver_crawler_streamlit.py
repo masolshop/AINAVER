@@ -194,23 +194,55 @@ class NaverPlaceCrawler:
             # 각 아이템에서 정보 추출
             for idx, item in enumerate(items[:max_results]):
                 try:
-                    # 상호명
-                    name = await self._get_text(item, ['.YwYLL', '.TYaxT', 'a.BwZrK', '[class*="name"]'])
-                    if not name:
+                    print(f"\n  [{idx+1}] 아이템 처리 중...")
+                    
+                    # 디버깅: 아이템 HTML 출력 (첫 번째만)
+                    if idx == 0:
+                        item_html = await item.inner_html()
+                        print(f"    📄 첫 번째 아이템 HTML (처음 1000자):")
+                        print(f"    {item_html[:1000]}")
+                    
+                    # 상호명 - 데스크톱용 셀렉터 추가
+                    name = await self._get_text(item, [
+                        '.place_bluelink',  # 데스크톱
+                        '.TYaxT',           # 데스크톱
+                        'a.place_bluelink', # 데스크톱
+                        '.YwYLL',           # 모바일
+                        'a.BwZrK',          # 모바일
+                        '[class*="name"]',
+                        'a',                # 일반
+                        'span'
+                    ])
+                    
+                    if not name or name == '':
+                        print(f"    ⚠️ 상호명 없음, 스킵")
                         continue
                     
+                    print(f"    ✓ 상호명: {name}")
+                    
                     # 카테고리
-                    category = await self._get_text(item, ['.KCMnt', '[class*="category"]'])
+                    category = await self._get_text(item, [
+                        '.YzBgS',           # 데스크톱
+                        '.KCMnt',           # 모바일
+                        '[class*="category"]',
+                        'span'
+                    ])
                     
                     # 주소
-                    addr = await self._get_text(item, ['.LDgIH', '[class*="addr"]', '[class*="address"]'])
+                    addr = await self._get_text(item, [
+                        '.LDgIH',           # 모바일
+                        '[class*="addr"]',
+                        '[class*="address"]',
+                        'span'
+                    ])
                     
                     # 전화번호 - 여러 방법으로 시도
                     phone = await self._get_text(item, [
                         'a[href^="tel:"]',
                         '.dry6Z',
                         '[class*="phone"]',
-                        '[class*="tel"]'
+                        '[class*="tel"]',
+                        'span'
                     ])
                     
                     # tel: 링크에서 전화번호 추출
