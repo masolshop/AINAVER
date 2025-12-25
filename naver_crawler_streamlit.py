@@ -254,21 +254,34 @@ class NaverPlaceCrawler:
                         print()
                     
                     # 상호명 - PC iframe (pcmap.place.naver.com) 우선
+                    # a.place_bluelink 전체 텍스트를 가져오면 "흥신소심부름센터" 전체가 나와야 함
                     print(f"    → 상호명 추출 시도 중...")
-                    name = await self._get_text(item, [
-                        '.TYaxT',           # PC iframe 상호명
-                        'span.TYaxT',       # PC iframe
-                        'a.place_bluelink', # PC iframe 링크
-                        '.place_bluelink',  # PC
-                        'a.YwYLL',          # 모바일 iframe
-                        '.YwYLL',           # 모바일
-                        'span.YwYLL',       # 모바일
-                        'a[class*="place"]',
-                        '[class*="name"]',
-                        'a',
-                        'span',
-                        'div'
-                    ], debug_name="상호명" if idx < 3 else "")
+                    
+                    # 먼저 링크 전체에서 추출 시도
+                    name = ""
+                    place_link = await item.query_selector('a.place_bluelink')
+                    if place_link:
+                        name = await place_link.inner_text()
+                        name = name.strip() if name else ""
+                        if idx < 3:
+                            print(f"      → a.place_bluelink 전체 텍스트: '{name}'")
+                    
+                    # 실패하면 기존 방식
+                    if not name:
+                        name = await self._get_text(item, [
+                            'a.place_bluelink', # PC iframe 링크
+                            '.place_bluelink',  # PC
+                            '.TYaxT',           # PC iframe 상호명
+                            'span.TYaxT',       # PC iframe
+                            'a.YwYLL',          # 모바일 iframe
+                            '.YwYLL',           # 모바일
+                            'span.YwYLL',       # 모바일
+                            'a[class*="place"]',
+                            '[class*="name"]',
+                            'a',
+                            'span',
+                            'div'
+                        ], debug_name="상호명" if idx < 3 else "")
                     
                     if not name or name == '':
                         print(f"    ⚠️ 상호명 없음, 스킵")
