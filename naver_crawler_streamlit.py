@@ -81,25 +81,44 @@ class NaverPlaceCrawler:
         results = []
         
         try:
+            print(f"\n🔍 '{keyword}' 검색 결과 추출 시작...")
+            
             # 검색 결과 로드 대기
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
+            
+            # 페이지 HTML 확인 (디버깅용)
+            html = await page.content()
+            print(f"  → 페이지 HTML 길이: {len(html)} 문자")
             
             # 스크롤하여 더 많은 결과 로드
-            for _ in range(3):
+            print("  → 스크롤 중...")
+            for i in range(3):
                 await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
                 await asyncio.sleep(0.5)
             
-            # 플레이스 아이템 찾기
+            # 플레이스 아이템 찾기 - 여러 셀렉터 시도
+            print("  → 셀렉터로 아이템 찾는 중...")
+            
             items = await page.query_selector_all('li[data-index]')
+            print(f"  → li[data-index]: {len(items)}개")
             
             if not items:
-                # 대체 셀렉터 시도
                 items = await page.query_selector_all('.item_inner')
+                print(f"  → .item_inner: {len(items)}개")
             
             if not items:
                 items = await page.query_selector_all('[class*="place"]')
+                print(f"  → [class*='place']: {len(items)}개")
             
-            print(f"  → 발견된 아이템 수: {len(items)}")
+            if not items:
+                items = await page.query_selector_all('.UEzoS')  # 새로운 셀렉터
+                print(f"  → .UEzoS: {len(items)}개")
+            
+            if not items:
+                items = await page.query_selector_all('li')  # 모든 li 태그
+                print(f"  → li (모두): {len(items)}개")
+            
+            print(f"  ✅ 최종 발견된 아이템 수: {len(items)}")
             
             # 각 아이템에서 정보 추출
             for idx, item in enumerate(items[:max_results]):
@@ -178,8 +197,15 @@ class NaverPlaceCrawler:
                     print(f"  ⚠️ 아이템 추출 실패: {str(e)}")
                     continue
             
+            if not results:
+                print(f"  ❌ '{keyword}': 추출된 결과 없음 (아이템은 {len(items)}개 발견)")
+            else:
+                print(f"  ✅ '{keyword}': {len(results)}개 결과 추출 완료")
+            
         except Exception as e:
             print(f"❌ 결과 추출 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
         
         return results
     
