@@ -186,7 +186,10 @@ class NaverPlaceCrawler:
             # 시도할 모든 셀렉터 (iframe 내부용)
             selectors = [
                 # PC 데스크톱 검색 결과 (pcmap.place.naver.com/place/list)
-                ('li.VLTHu', 'li.VLTHu (PC 검색 결과 리스트)'),  # 최우선
+                # 각 검색 결과는 ul 안의 li.VLTHu 내부의 개별 div
+                ('ul > li.VLTHu > div.qbGlu', 'ul > li > div.qbGlu (개별 검색 결과)'),  # 최우선
+                ('div.qbGlu', 'div.qbGlu (검색 결과 카드)'),
+                ('li.VLTHu', 'li.VLTHu (PC 검색 결과 리스트)'),
                 ('li.UEzoS', 'li.UEzoS (PC 검색 결과)'),
                 ('ul.place_section_content > li', 'ul.place_section_content > li'),
                 ('.place_list li', '.place_list li'),
@@ -238,11 +241,12 @@ class NaverPlaceCrawler:
                 try:
                     print(f"\n  [{idx+1}] 아이템 처리 중...")
                     
-                    # 디버깅: 아이템 HTML 출력 (첫 번째만)
-                    if idx == 0:
+                    # 디버깅: 아이템 HTML 출력 (첫 3개)
+                    if idx < 3:
                         item_html = await item.inner_html()
-                        print(f"    📄 첫 번째 아이템 HTML (처음 1000자):")
-                        print(f"    {item_html[:1000]}")
+                        print(f"    📄 [{idx+1}] 아이템 HTML (처음 500자):")
+                        print(f"    {item_html[:500]}")
+                        print()
                     
                     # 상호명 - PC iframe (pcmap.place.naver.com) 우선
                     name = await self._get_text(item, [
