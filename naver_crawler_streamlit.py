@@ -151,7 +151,7 @@ class NaverPlaceCrawler:
         results = []
         
         try:
-            print(f"\n🔍 '{keyword}' 검색 결과 추출 시작...")
+            print(f"\n🔍 '{keyword}' 검색 결과 추출 시작... (v2.0 - 자동 셀렉터)")
             
             # 검색 결과 로드 대기
             await asyncio.sleep(3)
@@ -205,19 +205,24 @@ class NaverPlaceCrawler:
             max_found = 0
             selected_selector_name = ""
             
+            print("  → 모든 셀렉터 시도 중...")
+            
             # 모든 셀렉터를 시도하고 가장 많은 아이템을 찾은 것 선택
             for selector, name in selectors:
                 found = await page.query_selector_all(selector)
-                print(f"  → {name}: {len(found)}개")
+                count = len(found)
+                print(f"    • {name}: {count}개")
                 
                 # 최소 3개 이상이고, 이전보다 많으면 업데이트
-                if len(found) >= 3 and len(found) > max_found:
+                if count >= 3 and count > max_found:
                     items = found
-                    max_found = len(found)
+                    max_found = count
                     selected_selector_name = name
+                    print(f"      → 현재 최적: {name} ({count}개)")
             
             # 3개 미만이면 첫 번째로 발견한 것 사용
             if not items:
+                print("  ⚠️ 3개 이상 찾지 못함, 첫 번째 셀렉터 사용")
                 for selector, name in selectors:
                     found = await page.query_selector_all(selector)
                     if found:
@@ -225,7 +230,7 @@ class NaverPlaceCrawler:
                         selected_selector_name = name
                         break
             
-            print(f"  ✅ 사용할 셀렉터: {selected_selector_name}")
+            print(f"\n  ✅ 최종 선택된 셀렉터: {selected_selector_name}")
             print(f"  ✅ 최종 발견된 아이템 수: {len(items)}")
             
             # 각 아이템에서 정보 추출
