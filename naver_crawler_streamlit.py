@@ -268,35 +268,26 @@ class NaverPlaceCrawler:
                         print(f"    → 이 아이템 내 모든 YwYLL 텍스트: {ywyll_matches}")
                         print()
                     
-                    # 상호명 - PC iframe (pcmap.place.naver.com) 우선
-                    # a.place_bluelink 전체 텍스트를 가져오면 "흥신소심부름센터" 전체가 나와야 함
+                    # 상호명 - YwYLL만 사용 (YzBgS는 카테고리)
                     print(f"    → 상호명 추출 시도 중...")
                     
-                    # 먼저 링크 전체에서 추출 시도
+                    # YwYLL 클래스에서만 추출 (실제 상호명/키워드)
                     name = ""
-                    place_link = await item.query_selector('a.place_bluelink')
-                    if place_link:
-                        name = await place_link.inner_text()
+                    ywyll_elem = await item.query_selector('.YwYLL')
+                    if ywyll_elem:
+                        name = await ywyll_elem.inner_text()
                         name = name.strip() if name else ""
                         if idx < 3:
-                            print(f"      → a.place_bluelink 전체 텍스트: '{name}'")
+                            print(f"      → .YwYLL 텍스트: '{name}'")
                     
-                    # 실패하면 기존 방식
+                    # 실패하면 전체 링크에서 추출
                     if not name:
-                        name = await self._get_text(item, [
-                            'a.place_bluelink', # PC iframe 링크
-                            '.place_bluelink',  # PC
-                            '.TYaxT',           # PC iframe 상호명
-                            'span.TYaxT',       # PC iframe
-                            'a.YwYLL',          # 모바일 iframe
-                            '.YwYLL',           # 모바일
-                            'span.YwYLL',       # 모바일
-                            'a[class*="place"]',
-                            '[class*="name"]',
-                            'a',
-                            'span',
-                            'div'
-                        ], debug_name="상호명" if idx < 3 else "")
+                        place_link = await item.query_selector('a.place_bluelink')
+                        if place_link:
+                            name = await place_link.inner_text()
+                            name = name.strip() if name else ""
+                            if idx < 3:
+                                print(f"      → a.place_bluelink 전체 텍스트: '{name}'")
                     
                     if not name or name == '':
                         print(f"    ⚠️ 상호명 없음, 스킵")
@@ -325,38 +316,44 @@ class NaverPlaceCrawler:
                         'span'
                     ])
                     
-                    # 전화번호 - PC iframe 우선
-                    phone = await self._get_text(item, [
-                        '.MPGxf',           # PC iframe 전화번호
-                        'span.MPGxf',       # PC iframe
-                        'a[href^="tel:"]',  # tel 링크
-                        '.dry6Z',           # 모바일
-                        '[class*="phone"]',
-                        '[class*="tel"]',
-                        'span'
-                    ])
+                    # 전화번호 추출
+                    phone = ""
                     
-                    # tel: 링크에서 전화번호 추출
-                    if not phone or phone == "전화":
-                        tel_link = await item.query_selector('a[href^="tel:"]')
-                        if tel_link:
-                            href = await tel_link.get_attribute('href')
-                            if href:
-                                phone = href.replace('tel:', '').strip()
+                    # 1) tel: 링크에서 우선 추출
+                    tel_link = await item.query_selector('a[href^="tel:"]')
+                    if tel_link:
+                        href = await tel_link.get_attribute('href')
+                        if href:
+                            phone = href.replace('tel:', '').strip()
+                            if idx < 3:
+                                print(f"      → tel: 링크에서 전화번호: '{phone}'")
                     
-                    # HTML에서 정규식으로 전화번호 찾기
-                    if not phone or phone == "전화":
+                    # 2) HTML에서 정규식으로 전화번호 찾기
+                    if not phone:
                         html = await item.inner_html()
+                        # 070 우선 (타지역 인터넷 전화)
                         phone_patterns = [
-                            r'(070[-\s]?\d{3,4}[-\s]?\d{4})',
-                            r'(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4})',
-                            r'(\d{4}[-\s]?\d{4})',
+                            r'(070[-\s]?\d{3,4}[-\s]?\d{4})',  # 070
+                            r'(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4})',  # 일반 지역번호
+                            r'(\d{4}[-\s]?\d{4})',  # 8자리
                         ]
                         for pattern in phone_patterns:
                             match = re.search(pattern, html)
                             if match:
                                 phone = match.group(1)
+                                if idx < 3:
+                                    print(f"      → 정규식으로 전화번호 발견: '{phone}'")
                                 break
+                    
+                    # 3) 셀렉터로 시도
+                    if not phone:
+                        phone = await self._get_text(item, [
+                            '.MPGxf',
+                            'span.MPGxf',
+                            '.dry6Z',
+                            '[class*="phone"]',
+                            '[class*="tel"]'
+                        ])
                     
                     # 평점
                     rating = await self._get_text(item, ['.h69bs', '[class*="rating"]', '[class*="star"]'])
@@ -422,22 +419,19 @@ class NaverPlaceCrawler:
                         keyword: str, image_url: str = "") -> bool:
         """메인/타지역 판정 (상호명 → 전화번호 순서)"""
         
-        # 1순위: 상호명 기반 필터링 (법적 사업자 등록 불가 업종)
+        # 1순위: 상호명 "흥신소" 정확히 3글자 = 무조건 타지역
         if name and name.strip() == "흥신소":
-            return True  # 흥신소(3글자) = 무조건 타지역
+            return True  # 흥신소(3글자만) = 무조건 타지역
         
-        # 2순위: 전화번호 기반 판정 - 070만 타지역, 나머지는 모두 메인!
+        # 2순위: 전화번호 070 = 무조건 타지역
         if phone and phone != "-":
-            # 070 번호 = 인터넷 전화 = 타지역 (유일한 타지역 기준!)
+            # 070 번호 = 인터넷 전화 = 타지역
             if '070' in phone or phone.startswith('070'):
                 return True  # 타지역
             
             # 그 외 모든 전화번호 = 메인
-            # 0507 (네이버 메인플레이스)
-            # 1509, 1688, 1588, 1577 (대표전화/고객센터)
-            # 02, 031 등 (지역번호)
-            # → 모두 메인으로 처리
-            if re.search(r'\d', phone):  # 숫자가 하나라도 있으면
+            # 0507, 1509, 1688, 02, 031 등 → 모두 메인
+            if re.search(r'\d', phone):
                 return False  # 메인
         
         # 3순위: 주소 기반 (번지수 있으면 메인)
