@@ -244,11 +244,17 @@ class NaverPlaceCrawler:
                     # 디버깅: 아이템 HTML 출력 (첫 3개)
                     if idx < 3:
                         item_html = await item.inner_html()
-                        print(f"    📄 [{idx+1}] 아이템 HTML (처음 500자):")
-                        print(f"    {item_html[:500]}")
+                        print(f"    📄 [{idx+1}] 아이템 전체 HTML 길이: {len(item_html)} 문자")
+                        print(f"    📄 [{idx+1}] 아이템 HTML (처음 800자):")
+                        print(f"    {item_html[:800]}")
+                        # 상호명 위치 확인
+                        if 'YwYLL' in item_html:
+                            start = item_html.find('YwYLL')
+                            print(f"    → YwYLL 위치: {start}, 주변: {item_html[max(0,start-50):start+150]}")
                         print()
                     
                     # 상호명 - PC iframe (pcmap.place.naver.com) 우선
+                    print(f"    → 상호명 추출 시도 중...")
                     name = await self._get_text(item, [
                         '.TYaxT',           # PC iframe 상호명
                         'span.TYaxT',       # PC iframe
@@ -256,12 +262,13 @@ class NaverPlaceCrawler:
                         '.place_bluelink',  # PC
                         'a.YwYLL',          # 모바일 iframe
                         '.YwYLL',           # 모바일
+                        'span.YwYLL',       # 모바일
                         'a[class*="place"]',
                         '[class*="name"]',
                         'a',
                         'span',
                         'div'
-                    ])
+                    ], debug_name="상호명" if idx < 3 else "")
                     
                     if not name or name == '':
                         print(f"    ⚠️ 상호명 없음, 스킵")
@@ -368,14 +375,16 @@ class NaverPlaceCrawler:
         
         return results
     
-    async def _get_text(self, element, selectors: List[str]) -> str:
+    async def _get_text(self, element, selectors: List[str], debug_name: str = "") -> str:
         """여러 셀렉터로 텍스트 추출 시도"""
-        for selector in selectors:
+        for idx, selector in enumerate(selectors):
             try:
                 elem = await element.query_selector(selector)
                 if elem:
                     text = await elem.inner_text()
                     if text and text.strip():
+                        if debug_name:
+                            print(f"      → {debug_name} 추출 성공: '{selector}' = '{text.strip()[:50]}'")
                         return text.strip()
             except:
                 continue
