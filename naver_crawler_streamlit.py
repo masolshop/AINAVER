@@ -75,13 +75,18 @@ class NaverPlaceCrawler:
                 
                 try:
                     # 네이버 플레이스 검색
-                    search_url = f"https://m.place.naver.com/search?query={keyword}"
+                    import urllib.parse
+                    encoded_keyword = urllib.parse.quote(keyword)
+                    search_url = f"https://m.place.naver.com/search?query={encoded_keyword}"
                     print(f"→ 검색 URL: {search_url}")
                     
-                    await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                    print("✓ 페이지 로드 완료")
+                    # 페이지 로드 - networkidle 대기
+                    await page.goto(search_url, wait_until="networkidle", timeout=30000)
+                    print("✓ 페이지 로드 완료 (networkidle)")
                     
-                    await asyncio.sleep(2)
+                    # 추가 대기 (JavaScript 실행 대기)
+                    await asyncio.sleep(5)
+                    print("✓ JavaScript 실행 대기 완료")
                     
                     # 검색 결과 추출
                     results = await self._extract_results(page, keyword, max_results)
@@ -119,6 +124,20 @@ class NaverPlaceCrawler:
             html = await page.content()
             print(f"  → 페이지 HTML 길이: {len(html)} 문자")
             
+            # HTML 샘플 출력 (처음 500자)
+            print(f"  → HTML 샘플 (처음 500자):")
+            print(f"     {html[:500]}")
+            
+            # 특정 키워드 검색
+            if "플레이스" in html or "place" in html.lower():
+                print("  ✓ HTML에 '플레이스' 관련 키워드 발견")
+            else:
+                print("  ❌ HTML에 '플레이스' 키워드 없음 (차단되었을 수 있음)")
+            
+            # 현재 URL 확인
+            current_url = page.url
+            print(f"  → 현재 URL: {current_url}")
+            
             # 스크롤하여 더 많은 결과 로드
             print("  → 스크롤 중...")
             for i in range(3):
@@ -128,24 +147,28 @@ class NaverPlaceCrawler:
             # 플레이스 아이템 찾기 - 여러 셀렉터 시도
             print("  → 셀렉터로 아이템 찾는 중...")
             
-            items = await page.query_selector_all('li[data-index]')
-            print(f"  → li[data-index]: {len(items)}개")
+            # 시도할 모든 셀렉터
+            selectors = [
+                ('li[data-index]', 'li[data-index]'),
+                ('.item_inner', '.item_inner'),
+                ('[class*="place"]', '[class*="place"]'),
+                ('.UEzoS', '.UEzoS'),
+                ('.place_item', '.place_item'),
+                ('.PlaceItem', '.PlaceItem'),
+                ('div[class*="item"]', 'div[class*="item"]'),
+                ('article', 'article'),
+                ('.search_item', '.search_item'),
+                ('li', 'li (모두)'),
+                ('div', 'div (모두)'),
+            ]
             
-            if not items:
-                items = await page.query_selector_all('.item_inner')
-                print(f"  → .item_inner: {len(items)}개")
-            
-            if not items:
-                items = await page.query_selector_all('[class*="place"]')
-                print(f"  → [class*='place']: {len(items)}개")
-            
-            if not items:
-                items = await page.query_selector_all('.UEzoS')  # 새로운 셀렉터
-                print(f"  → .UEzoS: {len(items)}개")
-            
-            if not items:
-                items = await page.query_selector_all('li')  # 모든 li 태그
-                print(f"  → li (모두): {len(items)}개")
+            items = []
+            for selector, name in selectors:
+                found = await page.query_selector_all(selector)
+                print(f"  → {name}: {len(found)}개")
+                if found and not items:
+                    items = found
+                    print(f"  ✅ 사용할 셀렉터: {name}")
             
             print(f"  ✅ 최종 발견된 아이템 수: {len(items)}")
             
