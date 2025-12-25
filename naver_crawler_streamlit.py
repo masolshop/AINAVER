@@ -176,25 +176,24 @@ class NaverPlaceCrawler:
             
             # 시도할 모든 셀렉터 (iframe 내부용)
             selectors = [
-                # iframe 내부 검색 결과 셀렉터
-                ('ul > li', 'ul > li (리스트 아이템)'),
-                ('.search_list > li', '.search_list > li'),
-                ('.place_list > li', '.place_list > li'),
-                ('li.search_item', 'li.search_item'),
+                # iframe 모바일 검색 결과 (우선순위 높음)
+                ('ul.place_section_content > li', 'ul.place_section_content > li (모바일)'),
+                ('li._YwYLL', 'li._YwYLL (모바일 아이템)'),
+                ('li._3cEhe', 'li._3cEhe (모바일 아이템)'),
+                ('.place_section_content li', '.place_section_content li'),
+                
+                # 모바일 일반
+                ('li[data-index]', 'li[data-index]'),
+                ('.item_inner', '.item_inner'),
+                ('.UEzoS', '.UEzoS'),
                 
                 # 데스크톱 셀렉터
                 ('.Ryr1F', '.Ryr1F (데스크톱 아이템)'),
                 ('.CHC5F', '.CHC5F (데스크톱 리스트)'),
                 ('li.VLTHu', 'li.VLTHu'),
-                ('div.ULb0v', 'div.ULb0v'),
                 
-                # 모바일 셀렉터
-                ('li[data-index]', 'li[data-index]'),
-                ('.item_inner', '.item_inner'),
-                ('.UEzoS', '.UEzoS'),
-                
-                # 일반 (최후 수단)
-                ('li', 'li (모두)'),
+                # 일반 리스트 (최후 수단, UI 버튼 제외)
+                ('ul > li:not([role="button"])', 'ul > li (버튼 제외)'),
             ]
             
             items = []
@@ -218,16 +217,19 @@ class NaverPlaceCrawler:
                         print(f"    📄 첫 번째 아이템 HTML (처음 1000자):")
                         print(f"    {item_html[:1000]}")
                     
-                    # 상호명 - 데스크톱용 셀렉터 추가
+                    # 상호명 - 모바일 iframe 우선
                     name = await self._get_text(item, [
+                        'a.YwYLL',          # 모바일 iframe
+                        '.YwYLL',           # 모바일
+                        'a[class*="place"]', # 모바일
                         '.place_bluelink',  # 데스크톱
                         '.TYaxT',           # 데스크톱
                         'a.place_bluelink', # 데스크톱
-                        '.YwYLL',           # 모바일
                         'a.BwZrK',          # 모바일
                         '[class*="name"]',
                         'a',                # 일반
-                        'span'
+                        'span',
+                        'div.YwYLL'         # div로도 시도
                     ])
                     
                     if not name or name == '':
@@ -238,15 +240,18 @@ class NaverPlaceCrawler:
                     
                     # 카테고리
                     category = await self._get_text(item, [
+                        '.KCMnt',           # 모바일 iframe
+                        'span.KCMnt',       # 모바일
                         '.YzBgS',           # 데스크톱
-                        '.KCMnt',           # 모바일
                         '[class*="category"]',
                         'span'
                     ])
                     
                     # 주소
                     addr = await self._get_text(item, [
-                        '.LDgIH',           # 모바일
+                        '.LDgIH',           # 모바일 iframe
+                        'span.LDgIH',       # 모바일
+                        '.IH4XH',           # 모바일 대체
                         '[class*="addr"]',
                         '[class*="address"]',
                         'span'
