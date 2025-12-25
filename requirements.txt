@@ -1,5 +1,6 @@
 streamlit
 pandas
 openpyxl
-playwright
+playwright==1.48.0
+playwright-stealth
 nest-asyncio
