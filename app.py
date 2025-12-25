@@ -12,17 +12,23 @@ import subprocess
 def install_playwright_browsers():
     """Playwright Chromium 브라우저 설치"""
     try:
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
             check=True,
-            capture_output=True
+            capture_output=True,
+            text=True
         )
+        print("✅ Playwright 브라우저 설치 완료")
+        print(result.stdout)
         return True
-    except:
+    except Exception as e:
+        print(f"❌ Playwright 설치 실패: {e}")
         return False
 
 # 브라우저 설치 실행
-install_playwright_browsers()
+install_status = install_playwright_browsers()
+if not install_status:
+    st.warning("⚠️ Playwright 브라우저 설치 중 문제가 발생했을 수 있습니다.")
 
 # 페이지 설정
 st.set_page_config(
@@ -194,14 +200,19 @@ if start_button and keywords:
             progress_bar.progress((idx) / len(keywords))
             
             # 크롤러 실행
-            crawler = NaverPlaceCrawler()
-            results = asyncio.run(crawler.crawl(keyword, max_results=max_results))
-            
-            if results:
-                all_results.extend(results)
-                st.info(f"✅ '{keyword}': {len(results)}개 업체 추출")
-            else:
-                st.warning(f"⚠️ '{keyword}': 결과 없음")
+            try:
+                crawler = NaverPlaceCrawler()
+                results = asyncio.run(crawler.crawl(keyword, max_results=max_results))
+                
+                if results:
+                    all_results.extend(results)
+                    st.info(f"✅ '{keyword}': {len(results)}개 업체 추출")
+                else:
+                    st.warning(f"⚠️ '{keyword}': 결과 없음")
+            except Exception as e:
+                st.error(f"❌ '{keyword}' 크롤링 실패: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
         
         progress_bar.progress(1.0)
         
