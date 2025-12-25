@@ -110,6 +110,11 @@ with st.sidebar:
     st.markdown("### 🎯 크롤링 옵션")
     max_results = st.slider("최대 결과 수", 5, 100, 20, 5)
     
+    st.markdown("### 🧪 테스트 모드")
+    demo_mode = st.checkbox("데모 모드 (Playwright 문제 시)", value=False)
+    if demo_mode:
+        st.warning("⚠️ 데모 데이터를 사용합니다 (실제 크롤링 아님)")
+    
     st.markdown("### 📊 통계")
     if 'stats' in st.session_state:
         stats = st.session_state.stats
@@ -201,18 +206,45 @@ if start_button and keywords:
             
             # 크롤러 실행
             try:
-                crawler = NaverPlaceCrawler()
-                results = asyncio.run(crawler.crawl(keyword, max_results=max_results))
+                # 데모 모드 체크
+                if demo_mode:
+                    # 데모 데이터 생성
+                    results = [
+                        {
+                            'name': f'{keyword} 업체{i+1}',
+                            'category': '테스트카테고리',
+                            'address': f'경기도 안산시 테스트동 {10+i}-{20+i}',
+                            'phone': '070-8086-2784' if i % 3 == 0 else f'031-{800+i}-{2000+i}',
+                            'rating': '4.5',
+                            'reviews': f'{i*10}',
+                            'image_url': '',
+                            'is_other_region': i % 3 == 0,
+                            'place_type': '타지역업체' if i % 3 == 0 else '주업체'
+                        }
+                        for i in range(min(10, max_results))
+                    ]
+                    st.info(f"🧪 '{keyword}': {len(results)}개 데모 데이터 생성 (실제 크롤링 아님)")
+                else:
+                    # 실제 크롤링
+                    crawler = NaverPlaceCrawler()
+                    results = asyncio.run(crawler.crawl(keyword, max_results=max_results))
+                    
+                    if not results:
+                        st.warning(f"⚠️ '{keyword}': 결과 없음")
+                        st.info("💡 Playwright 문제가 있다면 사이드바에서 '데모 모드'를 활성화해보세요.")
+                    else:
+                        st.success(f"✅ '{keyword}': {len(results)}개 업체 추출")
                 
                 if results:
                     all_results.extend(results)
-                    st.info(f"✅ '{keyword}': {len(results)}개 업체 추출")
-                else:
-                    st.warning(f"⚠️ '{keyword}': 결과 없음")
+                    
             except Exception as e:
-                st.error(f"❌ '{keyword}' 크롤링 실패: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+                st.error(f"❌ '{keyword}' 크롤링 실패")
+                with st.expander("🔍 오류 상세 정보"):
+                    st.code(str(e))
+                    import traceback
+                    st.code(traceback.format_exc())
+                st.info("💡 사이드바에서 '데모 모드'를 활성화하면 앱 기능을 테스트할 수 있습니다.")
         
         progress_bar.progress(1.0)
         
