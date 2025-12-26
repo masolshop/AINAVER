@@ -303,6 +303,9 @@ class NaverPlaceCrawler:
                         if detail_href and not detail_href.startswith('http'):
                             detail_href = f"https://map.naver.com{detail_href}"
                     
+                    if idx < 3:
+                        print(f"    → detail_href: {detail_href[:80] if detail_href else '없음'}")
+                    
                     temp_items.append({
                         'name': name,
                         'category': category or "미분류",
@@ -313,7 +316,7 @@ class NaverPlaceCrawler:
                         'detail_href': detail_href
                     })
                     
-                    print(f"    ✓ {name} - 기본 정보 수집 완료")
+                    print(f"    ✓ {name} - 기본 정보 수집 완료 (href: {'있음' if detail_href else '없음'})")
                     
                 except Exception as e:
                     print(f"    ⚠️ 아이템 추출 실패: {str(e)}")

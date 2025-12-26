@@ -16,3 +16,6 @@ gatherUsageStats = false
 
 [runner]
 fastReruns = true
+
+# Force redeploy - v2.1 with detailed phone logging
+deployVersion = "2.1.0"
