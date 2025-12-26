@@ -141,8 +141,8 @@ with st.sidebar:
     2. 전화번호 = "070" (인터넷 전화)
     
     **메인 업체:**
-    - 그 외 모든 전화번호
-    - 0507, 031, 02, 1688 등
+    - 0507 (네이버 대표번호) ✅
+    - 031, 02, 1688 등 일반 전화번호 ✅
     """)
     
     st.markdown("### 🎯 크롤링 옵션")
@@ -225,12 +225,17 @@ with col_btn2:
 # 크롤링 실행
 if start_button and keywords:
     
+    # 진행 중 표시
+    st.markdown("---")
+    progress_placeholder = st.empty()
+    progress_placeholder.markdown("### 🔄 크롤링 진행 중...")
+    
     # 프로그레스 바
     progress_bar = st.progress(0)
     status_text = st.empty()
     
     try:
-        status_text.markdown("### ⏳ 크롤링 중...")
+        status_text.markdown("### ⏳ 준비 중...")
         
         # Import the crawler
         from naver_crawler_streamlit import NaverPlaceCrawler
@@ -358,14 +363,22 @@ if start_button and keywords:
             st.markdown("---")
             st.markdown(f"### 📋 검색 결과 ({len(filtered_df)}개)")
             
-            # 데이터프레임 스타일링
-            def highlight_other_region(row):
-                if row['place_type'] == '타지역업체':
+            # place_type 컬럼을 더 명확하게 표시
+            display_df = filtered_df.copy()
+            display_df['place_type'] = display_df['place_type'].apply(
+                lambda x: '🟢 메인' if x == '주업체' else '🔴 타지역'
+            )
+            
+            # 데이터프레임 스타일링 - 메인/타지역 명확하게 구분
+            def highlight_place_type(row):
+                if '타지역' in str(row['place_type']):
+                    # 타지역 - 주황색 배경
                     return ['background-color: #fff3cd'] * len(row)
                 else:
+                    # 메인 - 초록색 배경
                     return ['background-color: #d4edda'] * len(row)
             
-            styled_df = filtered_df.style.apply(highlight_other_region, axis=1)
+            styled_df = display_df.style.apply(highlight_place_type, axis=1)
             st.dataframe(styled_df, use_container_width=True, height=400)
             
             # 다운로드 버튼

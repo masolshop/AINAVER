@@ -410,12 +410,13 @@ class NaverPlaceCrawler:
                                         if idx < 3:
                                             print(f"    → HTML에서 tel: 패턴 없음")
                                 
-                                # 정규식으로 찾기
+                                # 정규식으로 찾기 (다양한 패턴 지원)
                                 if not phone:
                                     phone_patterns = [
-                                        r'(070[-]\d{3,4}[-]\d{4})',
-                                        r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
-                                        r'(1\d{3}[-]\d{4})',
+                                        r'(0507[-]\d{4}[-]\d{4})',     # 0507-xxxx-xxxx (네이버 대표)
+                                        r'(070[-]\d{3,4}[-]\d{4})',    # 070-xxx-xxxx
+                                        r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',  # 02-xxx-xxxx, 031-xxx-xxxx
+                                        r'(1\d{3}[-]\d{4})',           # 1588-xxxx
                                     ]
                                     for pattern in phone_patterns:
                                         match = re.search(pattern, detail_html)
@@ -505,15 +506,19 @@ class NaverPlaceCrawler:
         if name and name.strip() == "흥신소":
             return True  # 흥신소(3글자만) = 무조건 타지역
         
-        # 2순위: 전화번호 070 = 무조건 타지역
+        # 2순위: 전화번호 기반 판정
         if phone and phone != "-" and phone != "전화번호 없음":
-            # 070 번호 = 인터넷 전화 = 타지역
+            # 0507 = 네이버 플레이스 대표번호 = 100% 메인
+            if '0507' in phone or phone.startswith('0507'):
+                return False  # 메인 (네이버 대표번호)
+            
+            # 070 = 인터넷 전화 = 타지역
             if '070' in phone or phone.startswith('070'):
                 return True  # 타지역
             
             # 유효한 전화번호가 있고 070이 아니면 메인
             if re.search(r'\d', phone):
-                return False  # 메인 (031, 02 등 일반 전화번호)
+                return False  # 메인 (031, 02, 1588 등 일반 전화번호)
         
         # 3순위: 전화번호 없으면 타지역
         return True  # 타지역 (전화번호 없음)
