@@ -323,24 +323,60 @@ class NaverPlaceCrawler:
             
             # ========== 2단계: 상세 페이지에서 전화번호 수집 ==========
             print(f"\n📞 2단계: 상세 페이지에서 전화번호 수집 중...")
+            print(f"  → 수집할 업체 수: {len(temp_items)}개")
             
             for idx, temp_item in enumerate(temp_items):
                 try:
-                    print(f"  [{idx+1}/{len(temp_items)}] {temp_item['name']} 전화번호 수집 중...")
+                    print(f"\n  [{idx+1}/{len(temp_items)}] {temp_item['name']} 전화번호 수집 중...")
                     
                     phone = ""
+                    
+                    # detail_href 확인
+                    if not temp_item['detail_href']:
+                        print(f"    ⚠️ detail_href 없음, 스킵")
+                        # 전화번호 없이 결과 추가
+                        is_other = self._is_other_region(
+                            temp_item['name'], 
+                            temp_item['address'], 
+                            "", 
+                            temp_item['rating'], 
+                            keyword, 
+                            temp_item['image_url']
+                        )
+                        
+                        results.append({
+                            'name': temp_item['name'],
+                            'category': temp_item['category'],
+                            'address': temp_item['address'],
+                            'phone': "전화번호 없음",
+                            'rating': temp_item['rating'],
+                            'reviews': temp_item['reviews'],
+                            'image_url': temp_item['image_url'],
+                            'is_other_region': is_other,
+                            'place_type': '타지역업체' if is_other else '주업체'
+                        })
+                        continue
+                    
+                    print(f"    → href: {temp_item['detail_href'][:80]}...")
                     
                     # 상세 페이지 방문
                     if temp_item['detail_href']:
                         try:
+                            print(f"    → 페이지 이동 중...")
                             await main_page.goto(temp_item['detail_href'], wait_until='networkidle', timeout=30000)
                             await asyncio.sleep(2)
                             
                             # place iframe 찾기
-                            for frame in main_page.frames:
+                            print(f"    → iframe 수: {len(main_page.frames)}")
+                            place_frame_found = False
+                            
+                            for frame_idx, frame in enumerate(main_page.frames):
                                 if 'place' in frame.url.lower():
+                                    place_frame_found = True
+                                    print(f"    → place iframe 발견: Frame {frame_idx}")
                                     await asyncio.sleep(1)
                                     detail_html = await frame.content()
+                                    print(f"    → HTML 길이: {len(detail_html)}")
                                     
                                     # tel: 링크 찾기
                                     tel_elem = await frame.query_selector('a[href^="tel:"]')
@@ -348,16 +384,20 @@ class NaverPlaceCrawler:
                                         tel_href = await tel_elem.get_attribute('href')
                                         if tel_href:
                                             phone = tel_href.replace('tel:', '').strip()
-                                            print(f"    ✅ 전화번호: {phone}")
+                                            print(f"    ✅ tel: 링크에서 전화번호: {phone}")
                                             break
+                                    else:
+                                        print(f"    → tel: 링크 없음")
                                     
                                     # HTML에서 직접 찾기
                                     if not phone:
                                         tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
                                         if tel_match:
                                             phone = tel_match.group(1).strip()
-                                            print(f"    ✅ 전화번호: {phone}")
+                                            print(f"    ✅ HTML에서 전화번호: {phone}")
                                             break
+                                        else:
+                                            print(f"    → HTML에서 tel: 패턴 없음")
                                     
                                     # 정규식으로 찾기
                                     if not phone:
@@ -372,11 +412,17 @@ class NaverPlaceCrawler:
                                                 temp_phone = match.group(1)
                                                 if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
                                                     phone = temp_phone
-                                                    print(f"    ✅ 전화번호: {phone}")
+                                                    print(f"    ✅ 정규식으로 전화번호: {phone}")
                                                     break
+                                        
+                                        if not phone:
+                                            print(f"    → 정규식으로도 전화번호 없음")
                                     
                                     if phone:
                                         break
+                            
+                            if not place_frame_found:
+                                print(f"    ⚠️ place iframe을 찾지 못함")
                         
                         except Exception as e:
                             print(f"    ⚠️ 상세 페이지 열기 실패: {str(e)[:100]}")
