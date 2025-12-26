@@ -256,6 +256,12 @@ class NaverPlaceCrawler:
                 try:
                     print(f"  [{idx+1}] 아이템 처리 중...")
                     
+                    # 디버깅: 처음 3개 아이템 HTML 출력
+                    if idx < 3:
+                        item_html = await item.inner_html()
+                        print(f"    → 아이템 HTML 길이: {len(item_html)}")
+                        print(f"    → 아이템 텍스트 샘플: {item_html[:400]}")
+                    
                     # 상호명 - place_bluelink 안의 YwYLL만 사용 (정확도 향상)
                     name = ""
                     place_link_for_name = await item.query_selector('a.place_bluelink')
@@ -376,16 +382,24 @@ class NaverPlaceCrawler:
                         except:
                             print(f"    ⚠️ URL 변경 없음 (타임아웃)")
                         
-                        await asyncio.sleep(2)  # 추가 로딩 대기
+                        await asyncio.sleep(3)  # 추가 로딩 대기 (3초로 증가)
+                        
+                        # 현재 메인 페이지 URL 확인
+                        current_main_url = main_page.url
+                        if idx < 3:
+                            print(f"    → 현재 메인 페이지 URL: {current_main_url[:100]}")
                         
                         # place iframe 찾기
                         print(f"    → iframe 수: {len(main_page.frames)}")
                         place_frame_found = False
                         
+                        # 모든 프레임 URL 출력 (처음 3개 아이템만)
+                        if idx < 3:
+                            for frame_idx, frame in enumerate(main_page.frames):
+                                print(f"      Frame {frame_idx}: {frame.url}")
+                        
                         for frame_idx, frame in enumerate(main_page.frames):
                             frame_url = frame.url.lower()
-                            if idx < 3:
-                                print(f"      Frame {frame_idx}: {frame.url[:80]}")
                             
                             # place/home 또는 place/entry가 포함된 iframe 찾기
                             if 'place' in frame_url and ('home' in frame_url or 'entry' in frame_url):
@@ -471,6 +485,8 @@ class NaverPlaceCrawler:
                         
                         if not place_frame_found:
                             print(f"    ⚠️ place 상세 iframe을 찾지 못함")
+                            if idx < 3:
+                                print(f"    ⚠️ 상세 페이지로 이동하지 않았을 가능성 - 메인 URL: {main_page.url[:100]}")
                         
                         # 뒤로 가기 (리스트로 돌아가기)
                         await main_page.go_back()
