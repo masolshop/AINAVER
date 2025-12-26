@@ -383,11 +383,11 @@ class NaverPlaceCrawler:
                             if 'place' in frame_url and ('home' in frame_url or 'entry' in frame_url):
                                 place_frame_found = True
                                 print(f"    → place 상세 iframe 발견: Frame {frame_idx}")
-                                await asyncio.sleep(1)
+                                await asyncio.sleep(2)  # 대기 시간 증가
                                 detail_html = await frame.content()
                                 print(f"    → HTML 길이: {len(detail_html)}")
                                 
-                                # tel: 링크 찾기
+                                # 1. tel: 링크 찾기 (가장 확실한 방법)
                                 tel_elem = await frame.query_selector('a[href^="tel:"]')
                                 if tel_elem:
                                     tel_href = await tel_elem.get_attribute('href')
@@ -397,9 +397,32 @@ class NaverPlaceCrawler:
                                         break
                                 else:
                                     if idx < 3:
-                                        print(f"    → tel: 링크 없음")
+                                        print(f"    → tel: 링크 없음, 다른 방법 시도...")
                                 
-                                # HTML에서 직접 찾기
+                                # 2. 다양한 셀렉터로 전화번호 요소 직접 찾기
+                                if not phone:
+                                    phone_selectors = [
+                                        'span.xlx7Q',  # PC 상세 페이지 전화번호
+                                        'span[class*="phone"]',
+                                        'div[class*="phone"]',
+                                        'a.phone',
+                                        '.contact_number',
+                                        '[data-phone]',
+                                    ]
+                                    
+                                    for selector in phone_selectors:
+                                        try:
+                                            phone_elem = await frame.query_selector(selector)
+                                            if phone_elem:
+                                                phone_text = await phone_elem.inner_text()
+                                                if phone_text and re.search(r'\d{2,4}[-\s]?\d{3,4}[-\s]?\d{4}', phone_text):
+                                                    phone = phone_text.strip()
+                                                    print(f"    ✅ 셀렉터({selector})에서 전화번호: {phone}")
+                                                    break
+                                        except:
+                                            continue
+                                
+                                # 3. HTML에서 직접 찾기
                                 if not phone:
                                     tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
                                     if tel_match:
@@ -410,18 +433,21 @@ class NaverPlaceCrawler:
                                         if idx < 3:
                                             print(f"    → HTML에서 tel: 패턴 없음")
                                 
-                                # 정규식으로 찾기 (다양한 패턴 지원)
+                                # 4. 정규식으로 찾기 (다양한 패턴 지원)
                                 if not phone:
                                     phone_patterns = [
-                                        r'(0507[-]\d{4}[-]\d{4})',     # 0507-xxxx-xxxx (네이버 대표)
-                                        r'(070[-]\d{3,4}[-]\d{4})',    # 070-xxx-xxxx
-                                        r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',  # 02-xxx-xxxx, 031-xxx-xxxx
-                                        r'(1\d{3}[-]\d{4})',           # 1588-xxxx
+                                        r'(0507[-\s]?\d{4}[-\s]?\d{4})',     # 0507-xxxx-xxxx (네이버 대표)
+                                        r'(070[-\s]?\d{3,4}[-\s]?\d{4})',    # 070-xxx-xxxx
+                                        r'(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4})',  # 02-xxx-xxxx, 031-xxx-xxxx
+                                        r'(1\d{3}[-\s]?\d{4})',           # 1588-xxxx
                                     ]
                                     for pattern in phone_patterns:
                                         match = re.search(pattern, detail_html)
                                         if match:
-                                            temp_phone = match.group(1)
+                                            temp_phone = match.group(1).strip()
+                                            # 하이픈 정규화
+                                            temp_phone = re.sub(r'\s+', '-', temp_phone)
+                                            # 날짜 제외 (8자리 연속 숫자)
                                             if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
                                                 phone = temp_phone
                                                 print(f"    ✅ 정규식으로 전화번호: {phone}")
@@ -429,6 +455,8 @@ class NaverPlaceCrawler:
                                     
                                     if not phone and idx < 3:
                                         print(f"    → 정규식으로도 전화번호 없음")
+                                        # HTML 일부 출력 (디버깅용)
+                                        print(f"    → HTML 샘플 (1000-1500자): {detail_html[1000:1500]}")
                                 
                                 if phone:
                                     break
@@ -520,8 +548,8 @@ class NaverPlaceCrawler:
             if re.search(r'\d', phone):
                 return False  # 메인 (031, 02, 1588 등 일반 전화번호)
         
-        # 3순위: 전화번호 없으면 타지역
-        return True  # 타지역 (전화번호 없음)
+        # 3순위: 전화번호 없으면 메인 (기본값)
+        return False  # 메인 (전화번호 없음도 메인으로 처리)
 
 
 # 테스트용 실행
