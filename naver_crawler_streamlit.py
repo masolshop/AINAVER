@@ -122,10 +122,10 @@ class NaverPlaceCrawler:
                     
                     # iframe이 있으면 그 안에서 추출, 없으면 메인 페이지에서 추출
                     if search_frame:
-                        results = await self._extract_results(search_frame, keyword, max_results)
+                        results = await self._extract_results(search_frame, keyword, max_results, main_page=page)
                     else:
                         print("⚠️ 검색 iframe 없음, 메인 페이지에서 추출 시도")
-                        results = await self._extract_results(page, keyword, max_results)
+                        results = await self._extract_results(page, keyword, max_results, main_page=page)
                     
                     print(f"✓ 최종 결과: {len(results)}개 추출")
                     return results
@@ -146,9 +146,13 @@ class NaverPlaceCrawler:
             traceback.print_exc()
             return []
     
-    async def _extract_results(self, page, keyword: str, max_results: int) -> List[Dict]:
+    async def _extract_results(self, page, keyword: str, max_results: int, main_page=None) -> List[Dict]:
         """검색 결과 추출"""
         results = []
+        
+        # main_page가 없으면 page를 사용 (하위 호환성)
+        if main_page is None:
+            main_page = page
         
         try:
             print(f"\n🔍 '{keyword}' 검색 결과 추출 시작... (v2.0 - 자동 셀렉터)")
@@ -346,17 +350,17 @@ class NaverPlaceCrawler:
                                 if idx < 3:
                                     print(f"      → 상세 페이지 열기 시도...")
                                 
-                                # href로 직접 이동 (더 안정적)
+                                # href로 직접 이동 (더 안정적) - main_page 사용!
                                 href = await place_link.get_attribute('href')
                                 if href:
                                     if not href.startswith('http'):
                                         href = f"https://map.naver.com{href}"
                                     
-                                    await page.goto(href, wait_until='networkidle', timeout=30000)
+                                    await main_page.goto(href, wait_until='networkidle', timeout=30000)
                                     await asyncio.sleep(3)  # 로딩 대기
                                     
                                     # 모든 iframe 확인
-                                    detail_frames = page.frames
+                                    detail_frames = main_page.frames
                                     if idx < 3:
                                         print(f"      → 상세 페이지 iframe 수: {len(detail_frames)}")
                                     
@@ -410,7 +414,7 @@ class NaverPlaceCrawler:
                                                 break
                                     
                                     # 뒤로 가기
-                                    await page.go_back()
+                                    await main_page.go_back()
                                     await asyncio.sleep(1)
                         except Exception as e:
                             if idx < 3:
