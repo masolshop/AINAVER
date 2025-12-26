@@ -345,28 +345,51 @@ class NaverPlaceCrawler:
                             if place_link:
                                 if idx < 3:
                                     print(f"      → 상세 페이지 열기 시도...")
-                                await place_link.click()
-                                await asyncio.sleep(2)  # 상세 페이지 로드 대기
                                 
-                                # 상세 페이지에서 전화번호 찾기
-                                # 새로운 iframe 확인
-                                detail_frames = page.frames
-                                for frame in detail_frames:
-                                    if 'place/home' in frame.url:
-                                        # 상세 페이지 iframe 발견
-                                        await asyncio.sleep(1)
-                                        detail_html = await frame.content()
+                                # href로 직접 이동 (더 안정적)
+                                href = await place_link.get_attribute('href')
+                                if href:
+                                    if not href.startswith('http'):
+                                        href = f"https://map.naver.com{href}"
+                                    
+                                    await page.goto(href, wait_until='networkidle', timeout=30000)
+                                    await asyncio.sleep(3)  # 로딩 대기
+                                    
+                                    # 모든 iframe 확인
+                                    detail_frames = page.frames
+                                    if idx < 3:
+                                        print(f"      → 상세 페이지 iframe 수: {len(detail_frames)}")
+                                    
+                                    for frame_idx, frame in enumerate(detail_frames):
+                                        if idx < 3:
+                                            print(f"        Frame {frame_idx}: {frame.url[:80]}...")
                                         
-                                        # tel: 링크 찾기
-                                        tel_match = re.search(r'href="tel:([0-9\-]+)"', detail_html)
-                                        if tel_match:
-                                            phone = tel_match.group(1).strip()
+                                        if 'place' in frame.url.lower():
+                                            await asyncio.sleep(1)
+                                            detail_html = await frame.content()
+                                            
                                             if idx < 3:
-                                                print(f"      → 상세 페이지에서 전화번호: '{phone}'")
-                                            break
-                                        
-                                        # 정규식으로 찾기
-                                        if not phone:
+                                                print(f"        → place iframe HTML 길이: {len(detail_html)}")
+                                            
+                                            # 1. tel: 링크 찾기 (가장 확실)
+                                            tel_elem = await frame.query_selector('a[href^="tel:"]')
+                                            if tel_elem:
+                                                tel_href = await tel_elem.get_attribute('href')
+                                                if tel_href:
+                                                    phone = tel_href.replace('tel:', '').strip()
+                                                    if idx < 3:
+                                                        print(f"        ✅ tel: 링크에서 전화번호: '{phone}'")
+                                                    break
+                                            
+                                            # 2. HTML에서 직접 찾기
+                                            tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
+                                            if tel_match:
+                                                phone = tel_match.group(1).strip()
+                                                if idx < 3:
+                                                    print(f"        ✅ HTML에서 전화번호: '{phone}'")
+                                                break
+                                            
+                                            # 3. 전화번호 패턴 찾기
                                             phone_patterns = [
                                                 r'(070[-]\d{3,4}[-]\d{4})',
                                                 r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
@@ -375,19 +398,24 @@ class NaverPlaceCrawler:
                                             for pattern in phone_patterns:
                                                 match = re.search(pattern, detail_html)
                                                 if match:
-                                                    phone = match.group(1)
-                                                    if not re.match(r'^\d{8}$', phone.replace('-', '')):
+                                                    temp_phone = match.group(1)
+                                                    # 날짜 제외 (8자리 연속 숫자)
+                                                    if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
+                                                        phone = temp_phone
                                                         if idx < 3:
-                                                            print(f"      → 상세 페이지 정규식: '{phone}'")
+                                                            print(f"        ✅ 정규식으로 전화번호: '{phone}'")
                                                         break
-                                        break
-                                
-                                # 뒤로 가기
-                                await page.go_back()
-                                await asyncio.sleep(1)
+                                            
+                                            if phone:
+                                                break
+                                    
+                                    # 뒤로 가기
+                                    await page.go_back()
+                                    await asyncio.sleep(1)
                         except Exception as e:
                             if idx < 3:
                                 print(f"      ⚠️ 상세 페이지 열기 실패: {str(e)}")
+                            pass
                     
                     # 평점
                     rating = await self._get_text(item, ['.h69bs', '[class*="rating"]', '[class*="star"]'])
