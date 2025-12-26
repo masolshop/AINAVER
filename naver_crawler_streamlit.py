@@ -499,7 +499,7 @@ class NaverPlaceCrawler:
     
     def _is_other_region(self, name: str, addr: str, phone: str, rating: str, 
                         keyword: str, image_url: str = "") -> bool:
-        """메인/타지역 판정 (상호명 → 전화번호 순서)"""
+        """메인/타지역 판정"""
         
         # 1순위: 상호명 "흥신소" 정확히 3글자 = 무조건 타지역
         if name and name.strip() == "흥신소":
@@ -513,35 +513,10 @@ class NaverPlaceCrawler:
             
             # 유효한 전화번호가 있고 070이 아니면 메인
             if re.search(r'\d', phone):
-                return False  # 메인
+                return False  # 메인 (031, 02 등 일반 전화번호)
         
-        # 전화번호 없으면 타지역 (의심)
-        
-        # 3순위: 주소 기반 (번지수 있으면 메인)
-        if addr and addr != "주소 정보 없음":
-            # 강력한 번지수 패턴
-            detailed_patterns = [
-                r'\d+-\d+',              # 123-45
-                r'\d+\s*-\s*\d+',        # 123 - 45
-                r'[동가]\s+\d+-\d+',      # 신사동 638-2, 저동2가 35-4
-                r'[로길]\s+\d+',          # 압구정로 306
-                r'[로길]\s*\d+번길',      # 선릉로 428번길
-            ]
-            
-            for pattern in detailed_patterns:
-                if re.search(pattern, addr):
-                    return False  # 메인 (번지수 있음)
-        
-        # 4순위: 이미지 없으면 타지역 의심
-        if not image_url or image_url == "":
-            return True  # 타지역 의심
-        
-        # 5순위: 평점 없으면 타지역 의심
-        if not rating or rating == "":
-            return True  # 타지역 의심
-        
-        # 기본값: 메인
-        return False
+        # 3순위: 전화번호 없으면 타지역
+        return True  # 타지역 (전화번호 없음)
 
 
 # 테스트용 실행
