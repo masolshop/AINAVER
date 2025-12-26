@@ -295,16 +295,16 @@ class NaverPlaceCrawler:
                     if img_elem:
                         image_url = await img_elem.get_attribute('src') or ""
                     
-                    # 상세 페이지 href 저장 (나중에 방문)
-                    detail_href = ""
+                    # 상세 페이지 링크 요소만 저장 (나중에 클릭)
+                    # href는 '#'이므로 사용 불가, 클릭 이벤트 필요
                     place_link = await item.query_selector('a.place_bluelink')
-                    if place_link:
-                        detail_href = await place_link.get_attribute('href')
-                        if detail_href and not detail_href.startswith('http'):
-                            detail_href = f"https://map.naver.com{detail_href}"
                     
                     if idx < 3:
-                        print(f"    → detail_href: {detail_href[:80] if detail_href else '없음'}")
+                        if place_link:
+                            href_attr = await place_link.get_attribute('href')
+                            print(f"    → place_link 있음 (href: {href_attr})")
+                        else:
+                            print(f"    → place_link 없음")
                     
                     temp_items.append({
                         'name': name,
@@ -313,10 +313,10 @@ class NaverPlaceCrawler:
                         'rating': rating or "",
                         'reviews': reviews or "",
                         'image_url': image_url,
-                        'detail_href': detail_href
+                        'item_element': item  # 아이템 요소 자체를 저장
                     })
                     
-                    print(f"    ✓ {name} - 기본 정보 수집 완료 (href: {'있음' if detail_href else '없음'})")
+                    print(f"    ✓ {name} - 기본 정보 수집 완료 (link: {'있음' if place_link else '없음'})")
                     
                 except Exception as e:
                     print(f"    ⚠️ 아이템 추출 실패: {str(e)}")
@@ -334,101 +334,113 @@ class NaverPlaceCrawler:
                     
                     phone = ""
                     
-                    # detail_href 확인
-                    if not temp_item['detail_href']:
-                        print(f"    ⚠️ detail_href 없음, 스킵")
-                        # 전화번호 없이 결과 추가
-                        is_other = self._is_other_region(
-                            temp_item['name'], 
-                            temp_item['address'], 
-                            "", 
-                            temp_item['rating'], 
-                            keyword, 
-                            temp_item['image_url']
-                        )
+                    # 아이템 요소에서 링크 찾기
+                    try:
+                        item_elem = temp_item['item_element']
+                        place_link = await item_elem.query_selector('a.place_bluelink')
                         
-                        results.append({
-                            'name': temp_item['name'],
-                            'category': temp_item['category'],
-                            'address': temp_item['address'],
-                            'phone': "전화번호 없음",
-                            'rating': temp_item['rating'],
-                            'reviews': temp_item['reviews'],
-                            'image_url': temp_item['image_url'],
-                            'is_other_region': is_other,
-                            'place_type': '타지역업체' if is_other else '주업체'
-                        })
-                        continue
-                    
-                    print(f"    → href: {temp_item['detail_href'][:80]}...")
-                    
-                    # 상세 페이지 방문
-                    if temp_item['detail_href']:
-                        try:
-                            print(f"    → 페이지 이동 중...")
-                            await main_page.goto(temp_item['detail_href'], wait_until='networkidle', timeout=30000)
-                            await asyncio.sleep(2)
+                        if not place_link:
+                            print(f"    ⚠️ place_link 없음, 스킵")
+                            # 전화번호 없이 결과 추가
+                            is_other = self._is_other_region(
+                                temp_item['name'], 
+                                temp_item['address'], 
+                                "", 
+                                temp_item['rating'], 
+                                keyword, 
+                                temp_item['image_url']
+                            )
                             
-                            # place iframe 찾기
-                            print(f"    → iframe 수: {len(main_page.frames)}")
-                            place_frame_found = False
+                            results.append({
+                                'name': temp_item['name'],
+                                'category': temp_item['category'],
+                                'address': temp_item['address'],
+                                'phone': "전화번호 없음",
+                                'rating': temp_item['rating'],
+                                'reviews': temp_item['reviews'],
+                                'image_url': temp_item['image_url'],
+                                'is_other_region': is_other,
+                                'place_type': '타지역업체' if is_other else '주업체'
+                            })
+                            continue
+                        
+                        print(f"    → 링크 클릭 시도...")
+                        
+                        # 링크 클릭 (JavaScript 이벤트 실행)
+                        await place_link.click()
+                        await asyncio.sleep(3)  # 상세 페이지 로드 대기
+                        
+                        # place iframe 찾기
+                        print(f"    → iframe 수: {len(main_page.frames)}")
+                        place_frame_found = False
+                        
+                        for frame_idx, frame in enumerate(main_page.frames):
+                            frame_url = frame.url.lower()
+                            if idx < 3:
+                                print(f"      Frame {frame_idx}: {frame.url[:80]}")
                             
-                            for frame_idx, frame in enumerate(main_page.frames):
-                                if 'place' in frame.url.lower():
-                                    place_frame_found = True
-                                    print(f"    → place iframe 발견: Frame {frame_idx}")
-                                    await asyncio.sleep(1)
-                                    detail_html = await frame.content()
-                                    print(f"    → HTML 길이: {len(detail_html)}")
-                                    
-                                    # tel: 링크 찾기
-                                    tel_elem = await frame.query_selector('a[href^="tel:"]')
-                                    if tel_elem:
-                                        tel_href = await tel_elem.get_attribute('href')
-                                        if tel_href:
-                                            phone = tel_href.replace('tel:', '').strip()
-                                            print(f"    ✅ tel: 링크에서 전화번호: {phone}")
-                                            break
-                                    else:
-                                        print(f"    → tel: 링크 없음")
-                                    
-                                    # HTML에서 직접 찾기
-                                    if not phone:
-                                        tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
-                                        if tel_match:
-                                            phone = tel_match.group(1).strip()
-                                            print(f"    ✅ HTML에서 전화번호: {phone}")
-                                            break
-                                        else:
-                                            print(f"    → HTML에서 tel: 패턴 없음")
-                                    
-                                    # 정규식으로 찾기
-                                    if not phone:
-                                        phone_patterns = [
-                                            r'(070[-]\d{3,4}[-]\d{4})',
-                                            r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
-                                            r'(1\d{3}[-]\d{4})',
-                                        ]
-                                        for pattern in phone_patterns:
-                                            match = re.search(pattern, detail_html)
-                                            if match:
-                                                temp_phone = match.group(1)
-                                                if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
-                                                    phone = temp_phone
-                                                    print(f"    ✅ 정규식으로 전화번호: {phone}")
-                                                    break
-                                        
-                                        if not phone:
-                                            print(f"    → 정규식으로도 전화번호 없음")
-                                    
-                                    if phone:
+                            # place/home 또는 place/entry가 포함된 iframe 찾기
+                            if 'place' in frame_url and ('home' in frame_url or 'entry' in frame_url):
+                                place_frame_found = True
+                                print(f"    → place 상세 iframe 발견: Frame {frame_idx}")
+                                await asyncio.sleep(1)
+                                detail_html = await frame.content()
+                                print(f"    → HTML 길이: {len(detail_html)}")
+                                
+                                # tel: 링크 찾기
+                                tel_elem = await frame.query_selector('a[href^="tel:"]')
+                                if tel_elem:
+                                    tel_href = await tel_elem.get_attribute('href')
+                                    if tel_href:
+                                        phone = tel_href.replace('tel:', '').strip()
+                                        print(f"    ✅ tel: 링크에서 전화번호: {phone}")
                                         break
-                            
-                            if not place_frame_found:
-                                print(f"    ⚠️ place iframe을 찾지 못함")
+                                else:
+                                    if idx < 3:
+                                        print(f"    → tel: 링크 없음")
+                                
+                                # HTML에서 직접 찾기
+                                if not phone:
+                                    tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
+                                    if tel_match:
+                                        phone = tel_match.group(1).strip()
+                                        print(f"    ✅ HTML에서 전화번호: {phone}")
+                                        break
+                                    else:
+                                        if idx < 3:
+                                            print(f"    → HTML에서 tel: 패턴 없음")
+                                
+                                # 정규식으로 찾기
+                                if not phone:
+                                    phone_patterns = [
+                                        r'(070[-]\d{3,4}[-]\d{4})',
+                                        r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
+                                        r'(1\d{3}[-]\d{4})',
+                                    ]
+                                    for pattern in phone_patterns:
+                                        match = re.search(pattern, detail_html)
+                                        if match:
+                                            temp_phone = match.group(1)
+                                            if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
+                                                phone = temp_phone
+                                                print(f"    ✅ 정규식으로 전화번호: {phone}")
+                                                break
+                                    
+                                    if not phone and idx < 3:
+                                        print(f"    → 정규식으로도 전화번호 없음")
+                                
+                                if phone:
+                                    break
                         
-                        except Exception as e:
-                            print(f"    ⚠️ 상세 페이지 열기 실패: {str(e)[:100]}")
+                        if not place_frame_found:
+                            print(f"    ⚠️ place 상세 iframe을 찾지 못함")
+                        
+                        # 뒤로 가기 (리스트로 돌아가기)
+                        await main_page.go_back()
+                        await asyncio.sleep(1)
+                    
+                    except Exception as e:
+                        print(f"    ⚠️ 상세 페이지 열기 실패: {str(e)[:100]}")
                     
                     # 최종 결과 추가
                     is_other = self._is_other_region(
