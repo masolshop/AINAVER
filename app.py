@@ -322,19 +322,22 @@ if start_button and keywords:
             total = len(df)
             main_count = len(df[df['place_type'] == '주업체'])
             other_count = len(df[df['place_type'] == '타지역업체'])
+            no_place_count = len(df[df['place_type'] == '플레이스 없음'])
             
             # 전체 통계 표시
             st.markdown("---")
             st.markdown("### 📊 크롤링 결과 통계")
             
-            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
             
             with col_stat1:
-                st.metric("총 업체 수", f"{total}개")
+                st.metric("총 키워드 수", f"{len(keywords)}개")
             with col_stat2:
-                st.metric("메인 업체", f"{main_count}개", f"{main_count/total*100:.1f}%")
+                st.metric("메인 업체", f"{main_count}개")
             with col_stat3:
-                st.metric("타지역 업체", f"{other_count}개", f"{other_count/total*100:.1f}%")
+                st.metric("타지역 업체", f"{other_count}개")
+            with col_stat4:
+                st.metric("플레이스 없음", f"{no_place_count}개")
             
             # 키워드별 통계 표시
             if len(keywords) > 1:
@@ -347,11 +350,13 @@ if start_button and keywords:
                     if len(kw_df) > 0:
                         kw_main = len(kw_df[kw_df['place_type'] == '주업체'])
                         kw_other = len(kw_df[kw_df['place_type'] == '타지역업체'])
+                        kw_no_place = len(kw_df[kw_df['place_type'] == '플레이스 없음'])
                         keyword_stats.append({
                             '검색 키워드': kw,
                             '총 개수': len(kw_df),
                             '메인': kw_main,
-                            '타지역': kw_other
+                            '타지역': kw_other,
+                            '플레이스 없음': kw_no_place
                         })
                 
                 if keyword_stats:
@@ -404,7 +409,7 @@ if start_button and keywords:
             # place_type 컬럼을 더 명확하게 표시
             display_df = filtered_df.copy()
             display_df['place_type'] = display_df['place_type'].apply(
-                lambda x: '🟢 메인' if x == '주업체' else '🔴 타지역'
+                lambda x: '🟢 메인' if x == '주업체' else ('⚪ 플레이스 없음' if x == '플레이스 없음' else '🔴 타지역')
             )
             
             # 컬럼 순서 재정렬 (검색 키워드를 맨 앞으로)
@@ -426,9 +431,13 @@ if start_button and keywords:
                     'place_type': '구분'
                 })
             
-            # 데이터프레임 스타일링 - 메인/타지역 명확하게 구분
+            # 데이터프레임 스타일링 - 메인/타지역/플레이스없음 구분
             def highlight_place_type(row):
-                if '타지역' in str(row.get('구분', row.get('place_type', ''))):
+                place_val = str(row.get('구분', row.get('place_type', '')))
+                if '플레이스 없음' in place_val:
+                    # 플레이스 없음 - 회색 배경
+                    return ['background-color: #e9ecef'] * len(row)
+                elif '타지역' in place_val:
                     # 타지역 - 주황색 배경
                     return ['background-color: #fff3cd'] * len(row)
                 else:

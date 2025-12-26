@@ -93,8 +93,8 @@ class NaverPlaceCrawler:
                     await page.goto(search_url, wait_until="networkidle", timeout=30000)
                     print("✓ 페이지 로드 완료 (networkidle)")
                     
-                    # 추가 대기 (JavaScript 실행 대기)
-                    await asyncio.sleep(5)
+                    # 추가 대기 (JavaScript 실행 대기) - 속도 향상
+                    await asyncio.sleep(2)
                     print("✓ JavaScript 실행 대기 완료")
                     
                     # iframe 확인
@@ -120,12 +120,23 @@ class NaverPlaceCrawler:
                                 print(f"✓ 플레이스 iframe 발견: {frame.url[:100]}...")
                                 break
                     
-                    # iframe이 있으면 그 안에서 추출, 없으면 메인 페이지에서 추출
+                    # iframe이 있으면 그 안에서 추출, 없으면 플레이스 없음 반환
                     if search_frame:
                         results = await self._extract_results(search_frame, keyword, max_results, main_page=page)
                     else:
-                        print("⚠️ 검색 iframe 없음, 메인 페이지에서 추출 시도")
-                        results = await self._extract_results(page, keyword, max_results, main_page=page)
+                        print("⚠️ 검색 iframe 없음 - 플레이스 탭 없음")
+                        # 플레이스 없음 결과 반환
+                        results = [{
+                            'search_keyword': keyword,
+                            'name': '플레이스 없음',
+                            'category': '-',
+                            'address': '-',
+                            'phone': '-',
+                            'rating': '-',
+                            'reviews': '-',
+                            'is_other_region': False,
+                            'place_type': '플레이스 없음'
+                        }]
                     
                     print(f"✓ 최종 결과: {len(results)}개 추출")
                     return results
@@ -387,7 +398,7 @@ class NaverPlaceCrawler:
                         except:
                             print(f"    ⚠️ URL 변경 없음 (타임아웃)")
                         
-                        await asyncio.sleep(3)  # 추가 로딩 대기 (3초로 증가)
+                        await asyncio.sleep(1.5)  # 추가 로딩 대기 - 속도 향상
                         
                         # 현재 메인 페이지 URL 확인
                         current_main_url = main_page.url
@@ -417,7 +428,7 @@ class NaverPlaceCrawler:
                             if is_detail_page:
                                 place_frame_found = True
                                 print(f"    → place 상세 iframe 발견: Frame {frame_idx}")
-                                await asyncio.sleep(2)  # 대기 시간 증가
+                                await asyncio.sleep(1)  # 대기 시간 - 속도 향상
                                 detail_html = await frame.content()
                                 print(f"    → HTML 길이: {len(detail_html)}")
                                 
@@ -534,7 +545,18 @@ class NaverPlaceCrawler:
                     continue
             
             if not results:
-                print(f"  ❌ '{keyword}': 추출된 결과 없음 (아이템은 {len(items)}개 발견)")
+                print(f"  ⚠️ '{keyword}': 추출된 결과 없음 (아이템은 {len(items)}개 발견) - 플레이스 없음으로 표시")
+                # 결과가 없어도 플레이스 없음으로 표시
+                results = [{
+                    'name': '플레이스 없음',
+                    'category': '-',
+                    'address': '-',
+                    'phone': '-',
+                    'rating': '-',
+                    'reviews': '-',
+                    'is_other_region': False,
+                    'place_type': '플레이스 없음'
+                }]
             else:
                 print(f"  ✅ '{keyword}': {len(results)}개 결과 추출 완료")
             
