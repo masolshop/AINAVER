@@ -363,9 +363,20 @@ class NaverPlaceCrawler:
                         
                         print(f"    → 링크 클릭 시도...")
                         
+                        # 현재 URL 저장
+                        old_url = main_page.url
+                        
                         # 링크 클릭 (JavaScript 이벤트 실행)
                         await place_link.click()
-                        await asyncio.sleep(3)  # 상세 페이지 로드 대기
+                        
+                        # URL 변경 대기 (최대 5초)
+                        try:
+                            await main_page.wait_for_url(lambda url: url != old_url, timeout=5000)
+                            print(f"    → 상세 페이지로 이동 완료")
+                        except:
+                            print(f"    ⚠️ URL 변경 없음 (타임아웃)")
+                        
+                        await asyncio.sleep(2)  # 추가 로딩 대기
                         
                         # place iframe 찾기
                         print(f"    → iframe 수: {len(main_page.frames)}")
