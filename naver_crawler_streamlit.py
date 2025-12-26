@@ -260,7 +260,12 @@ class NaverPlaceCrawler:
                     if idx < 3:
                         item_html = await item.inner_html()
                         print(f"    → 아이템 HTML 길이: {len(item_html)}")
-                        print(f"    → 아이템 텍스트 샘플: {item_html[:400]}")
+                        # YwYLL 클래스 찾기
+                        ywyll_test = await item.query_selector_all('.YwYLL')
+                        print(f"    → YwYLL 요소 수: {len(ywyll_test)}")
+                        for yw_idx, yw in enumerate(ywyll_test[:3]):
+                            yw_text = await yw.inner_text()
+                            print(f"      YwYLL[{yw_idx}]: {yw_text[:50]}")
                     
                     # 상호명 - place_bluelink 안의 YwYLL만 사용 (정확도 향상)
                     name = ""
@@ -401,8 +406,15 @@ class NaverPlaceCrawler:
                         for frame_idx, frame in enumerate(main_page.frames):
                             frame_url = frame.url.lower()
                             
-                            # place/home 또는 place/entry가 포함된 iframe 찾기
-                            if 'place' in frame_url and ('home' in frame_url or 'entry' in frame_url):
+                            # pcmap.place.naver.com/place/XXX/home 또는 /entry 형태만 매칭
+                            # (placePath=/home 파라미터는 제외)
+                            is_detail_page = (
+                                'pcmap.place.naver.com/place/' in frame_url and
+                                ('/home' in frame_url or '/entry' in frame_url) and
+                                'placepath=' not in frame_url  # URL 파라미터 제외
+                            )
+                            
+                            if is_detail_page:
                                 place_frame_found = True
                                 print(f"    → place 상세 iframe 발견: Frame {frame_idx}")
                                 await asyncio.sleep(2)  # 대기 시간 증가
