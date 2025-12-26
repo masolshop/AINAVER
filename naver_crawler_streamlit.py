@@ -256,22 +256,28 @@ class NaverPlaceCrawler:
                 try:
                     print(f"  [{idx+1}] 아이템 처리 중...")
                     
-                    # 상호명 - YwYLL만 사용
+                    # 상호명 - place_bluelink 안의 YwYLL만 사용 (정확도 향상)
                     name = ""
-                    ywyll_elem = await item.query_selector('.YwYLL')
-                    if ywyll_elem:
-                        name = await ywyll_elem.inner_text()
-                        name = name.strip() if name else ""
+                    place_link_for_name = await item.query_selector('a.place_bluelink')
+                    if place_link_for_name:
+                        ywyll_elem = await place_link_for_name.query_selector('.YwYLL')
+                        if ywyll_elem:
+                            name = await ywyll_elem.inner_text()
+                            name = name.strip() if name else ""
                     
+                    # 실패하면 전체에서 첫 번째 YwYLL 찾기
                     if not name:
-                        place_link = await item.query_selector('a.place_bluelink')
-                        if place_link:
-                            name = await place_link.inner_text()
+                        ywyll_elem = await item.query_selector('.YwYLL')
+                        if ywyll_elem:
+                            name = await ywyll_elem.inner_text()
                             name = name.strip() if name else ""
                     
                     if not name:
                         print(f"    ⚠️ 상호명 없음, 스킵")
                         continue
+                    
+                    if idx < 3:
+                        print(f"    → 상호명: {name}")
                     
                     # 주소
                     addr = ""
@@ -288,12 +294,6 @@ class NaverPlaceCrawler:
                     
                     # 리뷰 수
                     reviews = await self._get_text(item, ['.AQ85', '[class*="review"]'])
-                    
-                    # 이미지
-                    img_elem = await item.query_selector('img')
-                    image_url = ""
-                    if img_elem:
-                        image_url = await img_elem.get_attribute('src') or ""
                     
                     # 상세 페이지 링크 요소만 저장 (나중에 클릭)
                     # href는 '#'이므로 사용 불가, 클릭 이벤트 필요
@@ -312,7 +312,6 @@ class NaverPlaceCrawler:
                         'address': addr or "주소 정보 없음",
                         'rating': rating or "",
                         'reviews': reviews or "",
-                        'image_url': image_url,
                         'item_element': item  # 아이템 요소 자체를 저장
                     })
                     
@@ -347,8 +346,7 @@ class NaverPlaceCrawler:
                                 temp_item['address'], 
                                 "", 
                                 temp_item['rating'], 
-                                keyword, 
-                                temp_item['image_url']
+                                keyword
                             )
                             
                             results.append({
@@ -358,7 +356,6 @@ class NaverPlaceCrawler:
                                 'phone': "전화번호 없음",
                                 'rating': temp_item['rating'],
                                 'reviews': temp_item['reviews'],
-                                'image_url': temp_item['image_url'],
                                 'is_other_region': is_other,
                                 'place_type': '타지역업체' if is_other else '주업체'
                             })
@@ -477,8 +474,7 @@ class NaverPlaceCrawler:
                         temp_item['address'], 
                         phone, 
                         temp_item['rating'], 
-                        keyword, 
-                        temp_item['image_url']
+                        keyword
                     )
                     
                     results.append({
@@ -488,7 +484,6 @@ class NaverPlaceCrawler:
                         'phone': phone or "전화번호 없음",
                         'rating': temp_item['rating'],
                         'reviews': temp_item['reviews'],
-                        'image_url': temp_item['image_url'],
                         'is_other_region': is_other,
                         'place_type': '타지역업체' if is_other else '주업체'
                     })
@@ -527,7 +522,7 @@ class NaverPlaceCrawler:
         return ""
     
     def _is_other_region(self, name: str, addr: str, phone: str, rating: str, 
-                        keyword: str, image_url: str = "") -> bool:
+                        keyword: str) -> bool:
         """메인/타지역 판정"""
         
         # 1순위: 상호명 "흥신소" 정확히 3글자 = 무조건 타지역
