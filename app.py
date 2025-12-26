@@ -254,13 +254,13 @@ if start_button and keywords:
                     # 데모 데이터 생성
                     results = [
                         {
+                            'search_keyword': keyword,
                             'name': f'{keyword} 업체{i+1}',
                             'category': '테스트카테고리',
                             'address': f'경기도 안산시 테스트동 {10+i}-{20+i}',
                             'phone': '070-8086-2784' if i % 3 == 0 else f'031-{800+i}-{2000+i}',
                             'rating': '4.5',
                             'reviews': f'{i*10}',
-                            'image_url': '',
                             'is_other_region': i % 3 == 0,
                             'place_type': '타지역업체' if i % 3 == 0 else '주업체'
                         }
@@ -296,6 +296,9 @@ if start_button and keywords:
                         st.success(f"✅ '{keyword}': {len(results)}개 업체 추출")
                 
                 if results:
+                    # 각 결과에 검색 키워드 추가
+                    for result in results:
+                        result['search_keyword'] = keyword
                     all_results.extend(results)
                     
             except Exception as e:
@@ -320,7 +323,7 @@ if start_button and keywords:
             main_count = len(df[df['place_type'] == '주업체'])
             other_count = len(df[df['place_type'] == '타지역업체'])
             
-            # 통계 표시
+            # 전체 통계 표시
             st.markdown("---")
             st.markdown("### 📊 크롤링 결과 통계")
             
@@ -333,11 +336,33 @@ if start_button and keywords:
             with col_stat3:
                 st.metric("타지역 업체", f"{other_count}개", f"{other_count/total*100:.1f}%")
             
+            # 키워드별 통계 표시
+            if len(keywords) > 1:
+                st.markdown("---")
+                st.markdown("### 🔑 키워드별 통계")
+                
+                keyword_stats = []
+                for kw in keywords:
+                    kw_df = df[df['search_keyword'] == kw]
+                    if len(kw_df) > 0:
+                        kw_main = len(kw_df[kw_df['place_type'] == '주업체'])
+                        kw_other = len(kw_df[kw_df['place_type'] == '타지역업체'])
+                        keyword_stats.append({
+                            '검색 키워드': kw,
+                            '총 개수': len(kw_df),
+                            '메인': kw_main,
+                            '타지역': kw_other
+                        })
+                
+                if keyword_stats:
+                    kw_stats_df = pd.DataFrame(keyword_stats)
+                    st.dataframe(kw_stats_df, use_container_width=True, hide_index=True)
+            
             # 필터링
             st.markdown("---")
             st.markdown("### 🔍 결과 필터링")
             
-            filter_col1, filter_col2 = st.columns(2)
+            filter_col1, filter_col2, filter_col3 = st.columns(3)
             
             with filter_col1:
                 filter_type = st.selectbox(
@@ -346,6 +371,16 @@ if start_button and keywords:
                 )
             
             with filter_col2:
+                # 키워드 필터 (다중 키워드 검색인 경우만)
+                if len(keywords) > 1:
+                    filter_keyword = st.selectbox(
+                        "검색 키워드",
+                        ["전체"] + keywords
+                    )
+                else:
+                    filter_keyword = "전체"
+            
+            with filter_col3:
                 search_name = st.text_input("업체명 검색", placeholder="검색할 업체명")
             
             # 필터 적용
@@ -355,6 +390,9 @@ if start_button and keywords:
                 filtered_df = filtered_df[filtered_df['place_type'] == '주업체']
             elif filter_type == "타지역 업체만":
                 filtered_df = filtered_df[filtered_df['place_type'] == '타지역업체']
+            
+            if len(keywords) > 1 and filter_keyword != "전체":
+                filtered_df = filtered_df[filtered_df['search_keyword'] == filter_keyword]
             
             if search_name:
                 filtered_df = filtered_df[filtered_df['name'].str.contains(search_name, na=False)]
@@ -369,9 +407,28 @@ if start_button and keywords:
                 lambda x: '🟢 메인' if x == '주업체' else '🔴 타지역'
             )
             
+            # 컬럼 순서 재정렬 (검색 키워드를 맨 앞으로)
+            if 'search_keyword' in display_df.columns:
+                columns_order = ['search_keyword', 'name', 'category', 'address', 'phone', 'rating', 'reviews', 'place_type']
+                # 존재하는 컬럼만 선택
+                columns_order = [col for col in columns_order if col in display_df.columns]
+                display_df = display_df[columns_order]
+                
+                # 컬럼명 한글화
+                display_df = display_df.rename(columns={
+                    'search_keyword': '🔍 검색 키워드',
+                    'name': '상호명',
+                    'category': '카테고리',
+                    'address': '주소',
+                    'phone': '전화번호',
+                    'rating': '평점',
+                    'reviews': '리뷰수',
+                    'place_type': '구분'
+                })
+            
             # 데이터프레임 스타일링 - 메인/타지역 명확하게 구분
             def highlight_place_type(row):
-                if '타지역' in str(row['place_type']):
+                if '타지역' in str(row.get('구분', row.get('place_type', ''))):
                     # 타지역 - 주황색 배경
                     return ['background-color: #fff3cd'] * len(row)
                 else:
