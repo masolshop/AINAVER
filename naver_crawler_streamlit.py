@@ -248,210 +248,165 @@ class NaverPlaceCrawler:
             print(f"\n  ✅ 최종 선택된 셀렉터: {selected_selector_name}")
             print(f"  ✅ 최종 발견된 아이템 수: {len(items)}")
             
-            # 각 아이템에서 정보 추출
+            # ========== 1단계: 리스트에서 기본 정보만 수집 (iframe detach 방지) ==========
+            print(f"\n📋 1단계: 리스트에서 기본 정보 수집 중...")
+            temp_items = []
+            
             for idx, item in enumerate(items[:max_results]):
                 try:
-                    print(f"\n  [{idx+1}] 아이템 처리 중...")
+                    print(f"  [{idx+1}] 아이템 처리 중...")
                     
-                    # 디버깅: 아이템 HTML 출력 (첫 3개)
-                    if idx < 3:
-                        # 외부 HTML (태그 포함)
-                        outer_html = await item.evaluate("el => el.outerHTML")
-                        print(f"    📄 [{idx+1}] 아이템 OUTER HTML (처음 300자):")
-                        print(f"    {outer_html[:300]}")
-                        
-                        # 내부 HTML
-                        item_html = await item.inner_html()
-                        print(f"    📄 [{idx+1}] 아이템 전체 HTML 길이: {len(item_html)} 문자")
-                        print(f"    📄 [{idx+1}] 아이템 HTML (처음 800자):")
-                        print(f"    {item_html[:800]}")
-                        
-                        # 모든 YwYLL 찾기
-                        import re
-                        ywyll_matches = re.findall(r'<span class="YwYLL">([^<]+)</span>', item_html)
-                        print(f"    → 이 아이템 내 모든 YwYLL 텍스트: {ywyll_matches}")
-                        print()
-                    
-                    # 상호명 - YwYLL만 사용 (YzBgS는 카테고리)
-                    print(f"    → 상호명 추출 시도 중...")
-                    
-                    # YwYLL 클래스에서만 추출 (실제 상호명/키워드)
+                    # 상호명 - YwYLL만 사용
                     name = ""
                     ywyll_elem = await item.query_selector('.YwYLL')
                     if ywyll_elem:
                         name = await ywyll_elem.inner_text()
                         name = name.strip() if name else ""
-                        if idx < 3:
-                            print(f"      → .YwYLL 텍스트: '{name}'")
                     
-                    # 실패하면 전체 링크에서 추출
                     if not name:
                         place_link = await item.query_selector('a.place_bluelink')
                         if place_link:
                             name = await place_link.inner_text()
                             name = name.strip() if name else ""
-                            if idx < 3:
-                                print(f"      → a.place_bluelink 전체 텍스트: '{name}'")
                     
-                    if not name or name == '':
+                    if not name:
                         print(f"    ⚠️ 상호명 없음, 스킵")
                         continue
                     
-                    print(f"    ✓ 상호명: {name}")
-                    
-                    # 카테고리
-                    category = await self._get_text(item, [
-                        '.YzBgS',           # PC iframe
-                        'span.YzBgS',       # PC iframe
-                        '.KCMnt',           # 모바일 iframe
-                        'span.KCMnt',       # 모바일
-                        '[class*="category"]',
-                        'span'
-                    ])
-                    
-                    # 주소 - Pb4bU 클래스 사용
+                    # 주소
                     addr = ""
                     addr_elem = await item.query_selector('.Pb4bU')
                     if addr_elem:
                         addr = await addr_elem.inner_text()
                         addr = addr.strip() if addr else ""
-                        if idx < 3:
-                            print(f"      → .Pb4bU 주소: '{addr}'")
                     
-                    # 실패하면 다른 셀렉터 시도
-                    if not addr:
-                        addr = await self._get_text(item, [
-                            '.LDgIH',
-                            'span.LDgIH',
-                            '.IH4XH',
-                            '.P8YyJ',
-                            '[class*="addr"]',
-                            '[class*="address"]'
-                        ])
-                    
-                    # 전화번호 추출 - 상세 페이지 클릭 필요
-                    phone = ""
-                    
-                    # 1) 리스트에서 tel: 링크 시도
-                    tel_link = await item.query_selector('a[href^="tel:"]')
-                    if tel_link:
-                        href = await tel_link.get_attribute('href')
-                        if href:
-                            phone = href.replace('tel:', '').strip()
-                            if idx < 3:
-                                print(f"      → tel: 링크에서 전화번호: '{phone}'")
-                    
-                    # 2) 리스트에 없으면 상세 페이지 열기
-                    if not phone:
-                        try:
-                            # 업체 링크 클릭
-                            place_link = await item.query_selector('a.place_bluelink')
-                            if place_link:
-                                if idx < 3:
-                                    print(f"      → 상세 페이지 열기 시도...")
-                                
-                                # href로 직접 이동 (더 안정적) - main_page 사용!
-                                href = await place_link.get_attribute('href')
-                                if href:
-                                    if not href.startswith('http'):
-                                        href = f"https://map.naver.com{href}"
-                                    
-                                    await main_page.goto(href, wait_until='networkidle', timeout=30000)
-                                    await asyncio.sleep(3)  # 로딩 대기
-                                    
-                                    # 모든 iframe 확인
-                                    detail_frames = main_page.frames
-                                    if idx < 3:
-                                        print(f"      → 상세 페이지 iframe 수: {len(detail_frames)}")
-                                    
-                                    for frame_idx, frame in enumerate(detail_frames):
-                                        if idx < 3:
-                                            print(f"        Frame {frame_idx}: {frame.url[:80]}...")
-                                        
-                                        if 'place' in frame.url.lower():
-                                            await asyncio.sleep(1)
-                                            detail_html = await frame.content()
-                                            
-                                            if idx < 3:
-                                                print(f"        → place iframe HTML 길이: {len(detail_html)}")
-                                            
-                                            # 1. tel: 링크 찾기 (가장 확실)
-                                            tel_elem = await frame.query_selector('a[href^="tel:"]')
-                                            if tel_elem:
-                                                tel_href = await tel_elem.get_attribute('href')
-                                                if tel_href:
-                                                    phone = tel_href.replace('tel:', '').strip()
-                                                    if idx < 3:
-                                                        print(f"        ✅ tel: 링크에서 전화번호: '{phone}'")
-                                                    break
-                                            
-                                            # 2. HTML에서 직접 찾기
-                                            tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
-                                            if tel_match:
-                                                phone = tel_match.group(1).strip()
-                                                if idx < 3:
-                                                    print(f"        ✅ HTML에서 전화번호: '{phone}'")
-                                                break
-                                            
-                                            # 3. 전화번호 패턴 찾기
-                                            phone_patterns = [
-                                                r'(070[-]\d{3,4}[-]\d{4})',
-                                                r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
-                                                r'(1\d{3}[-]\d{4})',
-                                            ]
-                                            for pattern in phone_patterns:
-                                                match = re.search(pattern, detail_html)
-                                                if match:
-                                                    temp_phone = match.group(1)
-                                                    # 날짜 제외 (8자리 연속 숫자)
-                                                    if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
-                                                        phone = temp_phone
-                                                        if idx < 3:
-                                                            print(f"        ✅ 정규식으로 전화번호: '{phone}'")
-                                                        break
-                                            
-                                            if phone:
-                                                break
-                                    
-                                    # 뒤로 가기
-                                    await main_page.go_back()
-                                    await asyncio.sleep(1)
-                        except Exception as e:
-                            if idx < 3:
-                                print(f"      ⚠️ 상세 페이지 열기 실패: {str(e)}")
-                            pass
+                    # 카테고리
+                    category = await self._get_text(item, ['.YzBgS', 'span.YzBgS'])
                     
                     # 평점
-                    rating = await self._get_text(item, ['.h69bs', '[class*="rating"]', '[class*="star"]'])
+                    rating = await self._get_text(item, ['.h69bs', '[class*="rating"]'])
                     
                     # 리뷰 수
                     reviews = await self._get_text(item, ['.AQ85', '[class*="review"]'])
                     
-                    # 이미지 URL
+                    # 이미지
                     img_elem = await item.query_selector('img')
                     image_url = ""
                     if img_elem:
                         image_url = await img_elem.get_attribute('src') or ""
                     
-                    # 타지역 판정
-                    is_other = self._is_other_region(name, addr, phone, rating, keyword, image_url)
+                    # 상세 페이지 href 저장 (나중에 방문)
+                    detail_href = ""
+                    place_link = await item.query_selector('a.place_bluelink')
+                    if place_link:
+                        detail_href = await place_link.get_attribute('href')
+                        if detail_href and not detail_href.startswith('http'):
+                            detail_href = f"https://map.naver.com{detail_href}"
                     
-                    results.append({
+                    temp_items.append({
                         'name': name,
                         'category': category or "미분류",
                         'address': addr or "주소 정보 없음",
-                        'phone': phone or "전화번호 없음",
                         'rating': rating or "",
                         'reviews': reviews or "",
                         'image_url': image_url,
+                        'detail_href': detail_href
+                    })
+                    
+                    print(f"    ✓ {name} - 기본 정보 수집 완료")
+                    
+                except Exception as e:
+                    print(f"    ⚠️ 아이템 추출 실패: {str(e)}")
+                    continue
+            
+            print(f"\n✅ 1단계 완료: {len(temp_items)}개 업체 기본 정보 수집")
+            
+            # ========== 2단계: 상세 페이지에서 전화번호 수집 ==========
+            print(f"\n📞 2단계: 상세 페이지에서 전화번호 수집 중...")
+            
+            for idx, temp_item in enumerate(temp_items):
+                try:
+                    print(f"  [{idx+1}/{len(temp_items)}] {temp_item['name']} 전화번호 수집 중...")
+                    
+                    phone = ""
+                    
+                    # 상세 페이지 방문
+                    if temp_item['detail_href']:
+                        try:
+                            await main_page.goto(temp_item['detail_href'], wait_until='networkidle', timeout=30000)
+                            await asyncio.sleep(2)
+                            
+                            # place iframe 찾기
+                            for frame in main_page.frames:
+                                if 'place' in frame.url.lower():
+                                    await asyncio.sleep(1)
+                                    detail_html = await frame.content()
+                                    
+                                    # tel: 링크 찾기
+                                    tel_elem = await frame.query_selector('a[href^="tel:"]')
+                                    if tel_elem:
+                                        tel_href = await tel_elem.get_attribute('href')
+                                        if tel_href:
+                                            phone = tel_href.replace('tel:', '').strip()
+                                            print(f"    ✅ 전화번호: {phone}")
+                                            break
+                                    
+                                    # HTML에서 직접 찾기
+                                    if not phone:
+                                        tel_match = re.search(r'href=["\']tel:([0-9\-]+)["\']', detail_html)
+                                        if tel_match:
+                                            phone = tel_match.group(1).strip()
+                                            print(f"    ✅ 전화번호: {phone}")
+                                            break
+                                    
+                                    # 정규식으로 찾기
+                                    if not phone:
+                                        phone_patterns = [
+                                            r'(070[-]\d{3,4}[-]\d{4})',
+                                            r'(0\d{1,2}[-]\d{3,4}[-]\d{4})',
+                                            r'(1\d{3}[-]\d{4})',
+                                        ]
+                                        for pattern in phone_patterns:
+                                            match = re.search(pattern, detail_html)
+                                            if match:
+                                                temp_phone = match.group(1)
+                                                if not re.match(r'^\d{8}$', temp_phone.replace('-', '')):
+                                                    phone = temp_phone
+                                                    print(f"    ✅ 전화번호: {phone}")
+                                                    break
+                                    
+                                    if phone:
+                                        break
+                        
+                        except Exception as e:
+                            print(f"    ⚠️ 상세 페이지 열기 실패: {str(e)[:100]}")
+                    
+                    # 최종 결과 추가
+                    is_other = self._is_other_region(
+                        temp_item['name'], 
+                        temp_item['address'], 
+                        phone, 
+                        temp_item['rating'], 
+                        keyword, 
+                        temp_item['image_url']
+                    )
+                    
+                    results.append({
+                        'name': temp_item['name'],
+                        'category': temp_item['category'],
+                        'address': temp_item['address'],
+                        'phone': phone or "전화번호 없음",
+                        'rating': temp_item['rating'],
+                        'reviews': temp_item['reviews'],
+                        'image_url': temp_item['image_url'],
                         'is_other_region': is_other,
                         'place_type': '타지역업체' if is_other else '주업체'
                     })
                     
-                    print(f"  [{idx+1}] {name} - {phone} → {'타지역' if is_other else '메인'}")
+                    print(f"  [{idx+1}] {temp_item['name']} - {phone or '전화번호 없음'} → {'타지역' if is_other else '메인'}")
                     
                 except Exception as e:
-                    print(f"  ⚠️ 아이템 추출 실패: {str(e)}")
+                    print(f"  ⚠️ 전화번호 수집 실패: {str(e)[:100]}")
                     continue
             
             if not results:
