@@ -97,41 +97,53 @@ class NaverPlaceCrawler:
                     await asyncio.sleep(2)
                     print("✓ JavaScript 실행 대기 완료")
                     
-                    # iframe 확인
+                    # iframe이 생성될 때까지 대기 (최대 10초)
+                    print("🔍 플레이스 iframe 로딩 대기 중...")
+                    search_frame = None
+                    for attempt in range(10):  # 10번 시도 (1초 간격)
+                        frames = page.frames
+                        
+                        # 1순위: place/list URL이 있는 iframe
+                        for frame in frames:
+                            if 'place.naver.com/place/list' in frame.url:
+                                search_frame = frame
+                                print(f"✓ 검색 결과 iframe 발견 (시도 {attempt+1}/10): {frame.url[:100]}...")
+                                break
+                        
+                        if search_frame:
+                            break
+                        
+                        # iframe이 아직 없으면 1초 대기
+                        if attempt < 9:
+                            await asyncio.sleep(1)
+                            print(f"  재시도 {attempt+2}/10...")
+                    
+                    # iframe 확인 및 디버그 출력
                     frames = page.frames
-                    print(f"→ 발견된 iframe 수: {len(frames)}")
+                    print(f"→ 최종 iframe 수: {len(frames)}")
                     for i, frame in enumerate(frames[:5]):  # 처음 5개만 출력
                         frame_url = frame.url if len(frame.url) < 150 else frame.url[:150] + "..."
                         print(f"  Frame {i}: {frame_url}")
                     
-                    # searchIframe 찾기 - 실제 검색 결과가 있는 iframe
-                    search_frame = None
-                    
-                    # 1순위: place/list URL이 있는 iframe
-                    for frame in frames:
-                        if 'place.naver.com/place/list' in frame.url:
-                            search_frame = frame
-                            print(f"✓ 검색 결과 iframe 발견 (1순위): {frame.url[:100]}...")
-                            break
-                    
-                    # 2순위: searchIframe이라는 name을 가진 iframe
+                    # searchIframe 찾기 - 추가 탐색 (위에서 못 찾은 경우)
                     if not search_frame:
+                        # 2순위: searchIframe이라는 name을 가진 iframe
                         for frame in frames:
                             if 'searchIframe' in frame.name:
                                 search_frame = frame
                                 print(f"✓ 검색 결과 iframe 발견 (2순위 - searchIframe): {frame.url[:100]}...")
                                 break
                     
-                    # 3순위: URL에 'place.naver.com'이 포함된 iframe (메인 페이지 제외)
                     if not search_frame:
+                        # 3순위: URL에 'place.naver.com'이 포함된 iframe (메인 페이지 제외)
                         for frame in frames:
                             if 'place.naver.com' in frame.url and frame.url != page.url and 'about:blank' not in frame.url:
                                 search_frame = frame
                                 print(f"✓ 플레이스 iframe 발견 (3순위): {frame.url[:100]}...")
                                 break
                     
-                    # 4순위: iframe name에 'place'가 포함된 경우
                     if not search_frame:
+                        # 4순위: iframe name에 'place'가 포함된 경우
                         for frame in frames:
                             if 'place' in frame.name.lower():
                                 search_frame = frame
