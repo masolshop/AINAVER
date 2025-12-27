@@ -171,6 +171,12 @@ if not st.session_state.logged_in:
                             st.rerun()
                         else:
                             st.error(f"❌ {message}")
+                            
+                            # 디버그 정보 (임시)
+                            import hashlib
+                            with st.expander("🔧 디버그 정보 (관리자용)"):
+                                st.code(f"입력한 비밀번호 해시:\n{hashlib.sha256(login_password.encode()).hexdigest()}")
+                                st.caption("Google Sheets의 H열과 비교해보세요.")
     
     with tab2:
         st.markdown("### 회원가입")
