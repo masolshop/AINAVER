@@ -227,6 +227,13 @@ with st.sidebar:
         st.rerun()
     
     st.markdown("---")
+    
+    # 관리자 페이지 링크
+    st.markdown("### 👨‍💼 관리")
+    if st.button("🔐 관리자 페이지", use_container_width=True):
+        st.switch_page("pages/admin.py")
+    
+    st.markdown("---")
 
 # 사이드바
 with st.sidebar:
