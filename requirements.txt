@@ -4,3 +4,7 @@ openpyxl
 playwright==1.48.0
 playwright-stealth
 nest-asyncio
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2

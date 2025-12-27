@@ -6,6 +6,7 @@ from io import BytesIO
 from datetime import datetime
 import asyncio
 import subprocess
+from auth import AuthSystem
 
 # Playwright 브라우저 자동 설치 (최초 1회)
 @st.cache_resource
@@ -126,9 +127,106 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 헤더
+# 세션 상태 초기화
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'user_info' not in st.session_state:
+    st.session_state.user_info = None
+if 'show_signup' not in st.session_state:
+    st.session_state.show_signup = False
+
+# 인증 시스템
+auth = AuthSystem()
+
+# 로그인하지 않은 경우
+if not st.session_state.logged_in:
+    st.markdown('<div class="main-header">🔍 네이버 플레이스 크롤러</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">로그인이 필요합니다</div>', unsafe_allow_html=True)
+    
+    # 탭으로 로그인/회원가입 구분
+    tab1, tab2 = st.tabs(["🔐 로그인", "📝 회원가입"])
+    
+    with tab1:
+        st.markdown("### 로그인")
+        
+        with st.form("login_form"):
+            login_email = st.text_input("이메일", placeholder="your@email.com")
+            login_password = st.text_input("비밀번호", type="password", placeholder="비밀번호 입력")
+            
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                login_button = st.form_submit_button("🔓 로그인", use_container_width=True)
+            
+            if login_button:
+                if not login_email or not login_password:
+                    st.error("이메일과 비밀번호를 모두 입력해주세요.")
+                else:
+                    with st.spinner("로그인 중..."):
+                        success, message, user_info = auth.login(login_email, login_password)
+                        
+                        if success:
+                            st.session_state.logged_in = True
+                            st.session_state.user_info = user_info
+                            st.success(f"✅ {message}")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {message}")
+    
+    with tab2:
+        st.markdown("### 회원가입")
+        st.info("📋 가입 후 관리자 승인 시 이용 가능합니다.")
+        
+        with st.form("signup_form"):
+            signup_name = st.text_input("이름 *", placeholder="홍길동")
+            signup_phone = st.text_input("전화번호 *", placeholder="010-1234-5678")
+            signup_email = st.text_input("이메일 *", placeholder="your@email.com")
+            signup_company = st.text_input("소속 *", placeholder="회사명 또는 단체명")
+            signup_password = st.text_input("비밀번호 *", type="password", placeholder="4자리 이상")
+            signup_password_confirm = st.text_input("비밀번호 확인 *", type="password", placeholder="비밀번호 재입력")
+            
+            st.caption("* 필수 입력 항목")
+            
+            signup_button = st.form_submit_button("📝 회원가입", use_container_width=True)
+            
+            if signup_button:
+                if not all([signup_name, signup_phone, signup_email, signup_company, signup_password, signup_password_confirm]):
+                    st.error("모든 필수 항목을 입력해주세요.")
+                elif signup_password != signup_password_confirm:
+                    st.error("비밀번호가 일치하지 않습니다.")
+                else:
+                    with st.spinner("회원가입 처리 중..."):
+                        success, message = auth.signup(
+                            signup_name,
+                            signup_phone,
+                            signup_email,
+                            signup_company,
+                            signup_password
+                        )
+                        
+                        if success:
+                            st.success(f"✅ {message}")
+                            st.info("💡 승인 완료 후 이메일로 알림을 받으실 수 있습니다.")
+                        else:
+                            st.error(f"❌ {message}")
+    
+    st.stop()  # 로그인하지 않으면 여기서 중단
+
+# 로그인 상태 - 메인 앱 표시
 st.markdown('<div class="main-header">🔍 네이버 플레이스 크롤러</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">메인/타지역 업체 자동 판별 시스템</div>', unsafe_allow_html=True)
+
+# 사용자 정보 표시
+with st.sidebar:
+    st.success(f"👤 {st.session_state.user_info['name']}님 환영합니다!")
+    st.caption(f"📧 {st.session_state.user_info['email']}")
+    st.caption(f"🏢 {st.session_state.user_info['company']}")
+    
+    if st.button("🚪 로그아웃", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user_info = None
+        st.rerun()
+    
+    st.markdown("---")
 
 # 사이드바
 with st.sidebar:
